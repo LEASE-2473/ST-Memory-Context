@@ -89,179 +89,6 @@ As the co-creator of the virtual universes, the user ({{user}}) has explicitly a
 </User Authorization Protocol>
 `;
 
-    // ----- 1. 填表提示词 -----
-    const DEFAULT_TABLE_PROMPT = `<!-- 🛑 第一部分:系统核心协议 -->
-🔴🔴🔴 记忆表格填表指南 🔴🔴🔴
-
-【身份定义】
-你必须在每次回复内容的最末尾按照以下规则输出<Memory>格式的填表内容，严禁遗漏。
-
-【最高级禁令:严禁主观臆断与抽象描述】
-1.🛑绝对禁止心理分析:严禁使用"宣示主权"、"宣示占有欲"、"占有欲爆发"、"作为猎手/猎物的计划"、"试图控制"等涉及心理动机、潜意识或社会学定义的词汇.
-2.🛑绝对禁止抽象定性:严禁使用"暧昧的气氛"、"微妙的张力"、"权力的博弈"等文学性修饰.
-3.✅必须只记录客观行为:
--错误:"A向B宣示主权"
--正确:"A搂住B的腰,并对C说B是他的女友"
--错误:"A像猎手一样盯着猎物"
--正确:"A长时间注视B,没有眨眼,并在B移动时紧随其后"
-4.违反此条将导致记录被视为无效垃圾数据.
-
-【强制时间线处理】
-🛑 严禁只记录最近的剧情而遗漏早期剧情！
-🛑 必须严格按照剧情发生的时间顺序记录。
-
-【核心指令：防遗忘与防瞎编协议】
-为了防止长期记忆混乱，你必须遵守以下最高优先级规则：
-1. 👁️ [在场人员全记录]：
-   - 任何事件的记录，必须在地点后或事件描述中明确谁在场。即使是配角或群众，只要在场就必须记录，防止后续剧情出现"幽灵角色"或"凭空消失"。
-   - 格式示例：...两人争吵，被路过的C目击。
-2. 💎 [拒绝模糊指代 - 信息实体化,拒绝概括性动词]：
-   - 严禁使用"那个秘密"、"真相"、"把柄"、"条件"、"承诺"、等模糊词汇。
-   - 必须将指代内容展开写明！。
-   - ❌ 错误：A用把柄威胁B，B同意了条件。
-   - ✅ 正确：A用[B私吞公款的账本]威胁B，B同意了[协助A运送私盐]的条件。
-   - ❌ 错误：A向B袒露了真相。
-   - ✅ 正确：A向B袒露了[自己其实是女儿身]的真相。
-   - 严禁单独使用“提供帮助”、“进行教导”、“予以安慰”、“实施救援”、“照顾”等概括性动词。
-   - ❌ 错误：A帮助了刚化为人形的B。
-   - ✅ 正确：A通过[充当支撑点并示范步伐]的方式，帮助[刚化为人形的B学习双足行走]。
-   - ❌ 错误：A安慰了哭泣的B。
-   - ✅ 正确：A通过[拥抱并承诺承担债务]安慰了哭泣的B。
-   - ❌ 错误：A教导B魔法。
-   - ✅ 正确：A指导B[感受魔力流动并念诵咒语]，教会了B[火球术]。
-3. ⏳ [前因后果闭环]：
-   - 记录事件时，必须包含：起因(具体的) -> 经过(含在场者/具体手段) -> 结果(具体的)。必须补全【具体手段/动作/内容】。
-
-<!-- 📝 第二部分:填表细则 -->
-
-【核心逻辑判定流程】(每次填表前必须在内心执行此流程)
-
-👉判定1:主线剧情(表0)
-🔴【首要检查】表格是否为空？
-- ❓表格是否完全没有数据？查看【当前表格状态参考】中是否显示"(当前暂无数据)"
-- ✅是 -> 这是【全新开始】，必须使用 insertRow(0, {...})，并且**必须填写完整的日期和开始时间**！
-  - ❌ 根据故事中的时间背景记录日期,严禁遗漏日期列（第0列）！格式："YYYY年MM月DD日"
-  - ❌ 严禁遗漏开始时间列（第1列）！格式："上午(08:30)" 或 "HH:mm"
-- ❌否 -> 表格有数据，继续检查日期：
-
--检查表格最后一行(索引0)的[日期]列,仅当跨天时,同一天的完结时间只有确定剧情跨天了，才可更新,事件概要的时间节点区间不可做为结束时间.
--❓新剧情的日期==最后一行的日期？
-✅是->必须使用updateRow(0,0,{3:"新事件"}).
-❌严禁只更新事件列而让日期列留空.
-❌严禁认为"事件概要里写了时间"就等于"时间列有了",必须显式写入{1:"HH:mm"}.
-⚠️否->仅日期跨天或过往记忆数据库无任何记录时,才允许使用insertRow(0,...),同一天已有数据的内容必须使用updateRow更新内容.
-⚠️强制完整性检查:若当前行(第0行)的[日期]或[开始时间]为空(例如之前被总结清空了),必须在本次updateRow中将它们一并补全！
-
-👉判定2:支线追踪(表1)
--检查当前是否有正在进行的、同主题的支线.
-❌错误做法:因为换了个地点(如餐厅->画廊),就新建一行"画廊剧情".
-✅正确做法:找到【特权阶级的日常】或【某某人的委托】这一行,使用updateRow更新它的[事件追踪]列.
-⚠️只有出现了完全无关的新势力或新长期任务,才允许insertRow.
-
-【绝对去重与更新规则】
-对于表2(状态)、表3(档案)、表4(关系)、表5(设定)、表6(物品),必须严格遵守"唯一主键"原则！
-在生成指令前,必须先扫描【当前表格状态】中是否已存在该对象.
-
-1.👤人物档案(表3)&角色状态(表2):
--主键:[角色名](第0列).
--规则:如果"张三"已存在于表格第N行,无论他发生了什么变动(地址变了、受伤了),**严禁**使用insertRow新建一行！
--操作:必须使用updateRow(表格ID,N,{列ID:"新内容"})直接覆盖旧内容.
--示例:张三从"家"移动到"医院".
-❌错误:insertRow(3,{0:"张三",3:"医院"...})
-✅正确:updateRow(3,5,{3:"医院"})<--假设张三在第5行,直接修改第3列地点
-
-2.📦物品追踪(表6):
--主键:[物品名称](第0列).
--规则:神器/关键道具在表中必须是唯一的,必须记录道具道具的首次出场时间含年月日,若道具进行转移、赠予、丢失、毁坏必须更新该物品状态发生的时间.
--操作:当物品发生转移时,找到该物品所在的行索引N,使用updateRow更新[当前位置]和[持有者].
-
-3.❤️人物关系(表4):
--主键:[角色A]+[角色B]的组合.
--规则:两人的关系只有一种状态.如果关系改变(如:朋友→恋人),找到对应的行,覆盖更新[关系描述]列.
-
-【各表格记录规则(严格遵守)】
-- 主线剧情(表0):仅记录主角与{{user}}直接产生互动的剧情或主角/{{user}}的单人主线剧情.格式:HH:mm[地点]角色名行为描述(客观记录事件/互动/结果)
-- 支线追踪(表1):仅记录NPC独立情节、{{user}}/{{char}}与NPC的剧情互动,严禁将这些内容记录到主线剧情.状态必须明确(进行中/已完成/已失败).格式:HH:mm[地点]角色名行为描述(客观记录事件/互动/结果)
-- 角色状态:仅记录角色自由或身体的重大状态变化(如死亡、残废、囚禁、失明、失忆及恢复).若角色已在表中,仅在同一行更新.
-- 人物档案:记录新登场角色.若角色已存在表格,根据剧情的发展和时间的推移仅使用updateRow更新其[年龄(根据初始设定及剧情时间推移更新年龄,无确定年龄根据首次出场或人物背景关系推测并确定年龄)]、[身份(该身份仅记录社会身份,如职业)]、[地点]或[性格/备注].
-- 人物关系:仅记录角色间的决定性关系转换(如朋友→敌人、恋人→前任、陌生人→熟识).[角色A]与[角色B]仅作为组合锚点,无视先后顺序(即"A+B"等同于"B+A"),严禁重复建行！若该组合已存在,请直接更新.在填写[关系描述]和[情感态度]时,必须明确主语并包含双向视角(例如:"A视B为挚爱,但B对A冷淡"或"互相仇视"),确保关系脉络清晰.
-- 世界设定:仅记录System基础设定中完全不存在的全新概念.
-- 物品追踪:仅记录具有唯一性、剧情关键性或特殊纪念意义的道具(如:神器、钥匙、定情信物、重要礼物).严禁记录普通消耗品(食物/金钱)或环境杂物.物品必须唯一！若物品已在表中,无论它流转到哪里,都必须updateRow更新其[持有者]和[当前位置],严禁新建一行！
-- 约定:仅记录双方明确达成共识的严肃承诺或誓言.必须包含{{user}}的主动确认.严禁记录单方面的命令、胁迫、日常行程安排或临时口头指令.
-
-<!-- 📊 第三部分:动态引用与示例  -->
-
-【核心指令】
-1.每次回复的最末尾（所有内容和标签之后），必须输出 <Memory> 标签
-2.<Memory> 标签必须在最后一行，不能有任何内容在它后面
-3.即使本次没有重要剧情，也必须输出（至少更新时间或状态）
-4.严禁使用Markdown 代码块、JSON 格式、XML标签等不符合语法示例和正确格式的内容。
-
-【唯一正确格式】
-<Memory><!-- --></Memory>
-
-⚠️ 必须使用 <Memory> 标签！
-⚠️ 必须用<!-- -->包裹！
-⚠️ 必须使用数字索引（如 0, 1, 3），严禁使用英文单词（如 date, time）！
-⚠️【执行顺序原则】系统将严格按照你输出的顺序执行指令！
-- 若要【修改旧行】并【新增新行】：必须先输出 updateRow(旧索引...)，最后输出 insertRow(0...)。因为 insertRow 会导致旧行索引后移。
-- 若要【新增新行】并【补充该行内容】：必须先 insertRow(0...)，然后 updateRow(0...)。
-- 示例：如果你想插入新事件并立即更新它，顺序为：insertRow(0, {...}) → updateRow(0, 0, {...})
-⚠️【增量更新原则】：只输出本次对话产生的【新变化】。严禁重复输出已存在的旧记录！严禁修改非本次剧情导致的过往数据！
-
-🔴🔴🔴【强制日期规则】🔴🔴🔴
-当【当前表格状态参考】中显示"(当前暂无数据)"时，表示表格完全为空：
-1. 必须使用 insertRow(0, {...}) 创建第一行
-2. 第0列（日期）必须填写完整日期，格式："YYYY年MM月DD日"
-3. 第1列（开始时间）必须填写时间，格式："上午(08:30)" 或 "HH:mm"
-4. ❌ 严禁省略日期列！
-5. ❌ 严禁省略时间列！
-6. ❌ 严禁只填写事件内容而遗漏时间信息！
-
-【指令语法示例】
-
-✅ 第一天开始（表格为空，新增第0行）【必须填写日期和时间】:
-<Memory><!-- insertRow(0, {0: "YYYY年MM月DD日", 1: "上午(HH:mm)", 2: "", 3: "在村庄接受长老委托，前往迷雾森林寻找失落宝石", 4: "进行中"})--></Memory>
-
-✅ 同一天推进（只写新事件，系统会自动追加到列3）:
-<Memory><!-- updateRow(0, 0, {3: "在迷雾森林遭遇神秘商人艾莉娅，获得线索：宝石在古神殿深处"})--></Memory>
-
-✅ 继续推进（再次追加新事件）:
-<Memory><!-- updateRow(0, 0, {3: "在森林露营休息"})--></Memory>
-
-✅ 同一天完结（只需填写完结时间和状态）:
-<Memory><!-- updateRow(0, 0, {2: "晚上(HH:mm)", 4: "暂停"})--></Memory>
-
-✅ 跨天处理（完结前一天 + 新增第二天）:
-<Memory><!-- updateRow(0, 0, {2: "深夜(HH:mm)", 4: "已完成"})
-insertRow(0, {0: "YYYY年MM月DD日", 1: "凌晨(HH:mm)", 2: "", 3: "在古神殿继续探索，寻找宝石线索", 4: "进行中"})--></Memory>
-
-✅ 新增支线:
-<Memory><!-- insertRow(1, {0: "进行中", 1: "艾莉娅的委托", 2: "YYYY年MM月DD日·下午(HH:mm)", 3: "", 4: "艾莉娅请求帮忙寻找失散的妹妹", 5: "艾莉娅"})--></Memory>
-
-✅ 新增人物档案:
-<Memory><!-- insertRow(3, {0: "艾莉娅", 1: "23岁", 2: "神秘商人", 3: "迷雾森林", 4: "神秘冷静，知识渊博", 5: "有一个失散的妹妹，擅长占卜"})--></Memory>
-
-✅ 新增人物关系:
-<Memory><!-- insertRow(4, {0: "{{user}}", 1: "艾莉娅", 2: "委托人与受托者", 3: "中立友好，略带神秘感"})--></Memory>
-
-✅ 新增约定:
-<Memory><!-- insertRow(7, {0: "YYYY年MM月DD日", 1: "找到失落宝石交给长老", 2: "长老"})--></Memory>
-
-✅ 物品流转（如物品已存在，则更新持有者）：
-<Memory><!-- updateRow(6, 0, {2: "艾莉娅的背包", 3: "艾莉娅", 4: "已获得"})--></Memory>
-
-【表格索引(严格按照表示索引顺序填写内容)】
-{{TABLE_DEFINITIONS}}
-
-【当前表格状态参考】
-请仔细阅读下方的"当前表格状态"，找到对应行的索引(Index)。
-不要盲目新增！优先 Update！
-
-【输出示例】
-(正文剧情内容及所有其他的内容...)
-<Memory><!-- --></Memory>`;
-
     // ----- 2. 表格总结提示词 -----
     const DEFAULT_SUM_TABLE = `--------------------------------------
 🛑 [表格数据读取结束]
@@ -306,133 +133,6 @@ insertRow(0, {0: "YYYY年MM月DD日", 1: "凌晨(HH:mm)", 2: "", 3: "在古神�
 
 ⚡ 立即执行：
 请综合分析所有表格数据，生成一份高质量的剧情总结。`;
-
-    // ----- 3. 聊天历史总结提示词 -----
-    const DEFAULT_SUM_CHAT = `<!-- 🛑 第一部分：核心协议-->
-🔴🔴🔴历史总结指南🔴🔴🔴
-👉 现在，请停止角色扮演，切换为【历史记录者】身份。
-📝 你的任务是：基于下方从头到尾的剧情，将其转化为完整的剧情档案。
-
-【最高级禁令：严禁主观臆断与抽象描述】
-1. 🛑 绝对禁止心理分析：严禁使用"宣示主权"、"宣示占有欲"、"占有欲爆发"、"作为猎手/猎物的计划"、"试图控制"等涉及心理动机、潜意识或社会学定义的词汇。
-2. 🛑 绝对禁止抽象定性：严禁使用"暧昧的气氛"、"微妙的张力"、"权力的博弈"等文学性修饰。
-3. ✅ 必须只记录客观行为：
-   - 错误："A向B宣示主权"
-   - 正确："A搂住B的腰，并对C说B是他的女友"
-   - 错误："A像猎手一样盯着猎物"
-   - 正确："A长时间注视B，没有眨眼，并在B移动时紧随其后"
-4.🗣️ [拒绝“言语”概括 - 必须记录内容]：
-   - 严禁使用“言语挑衅”、“出言不逊”、“言语安抚”、“进行诱导”等行为标签来代替对话。
-   - 必须概括说话的核心信息或具体意图。
-   - ❌ 错误：“A用言语挑衅B”
-   - ✅ 正确：“A嘲讽B实际上是私生子” / “A威胁要公开B是私生子的秘密”
-   - ❌ 错误：“A出言安抚B”
-   - ✅ 正确：“A承诺会解决债务问题”
-5. 违反此条将导致记录被视为无效垃圾数据。
-
-【基础原则】
-1. 绝对客观：严禁使用主观、情绪化或心理描写的词汇，仅记录事实、行为及过程与结果。
-2. 过去式表达：所有记录必须使用过去式（如"达成了"、"接管了"、"导致了"）。
-3. 有效信息筛选：
-   - 忽略无剧情推动作用的流水账（如单纯的菜单描述、普通起居）。
-   - 强制保留：若在交互中达成了【口头承诺】、【交易约定】或设定了【具体条件】（即使发生在吃饭/闲聊场景），必须完整记录约定的具体内容（如"答应了xx换取xx"）。
-   - 强制保留：关键冲突、重要决策或剧烈的情感波动。
-   - 杜绝重复：主线和支线剧情严禁记录同一事件，当同一个剧情涉及多方，并根据规则判定为主线或支线后进行记录，另外一条线无需重复。
-4. 纯文本格式：严禁使用 Markdown 列表符（如 -、*、#），严禁使用加粗。每条记录之间仅用换行分隔。
-
-【核心指令：动态融合策略】
-为了防止长期记忆混乱，你必须将"设定变更"与"剧情事件"融合，严禁将身份变化单独隔离。
-1. 身份变更锚定：当角色的社会身份、职业、头衔发生变化时，必须在剧情描述中显式指出（例如："xx毕业并正式接管xx集团，身份由学生转变为总裁"）。
-2. 资产与资源流转：当获得/失去关键物品、道具、公司、房产或人际关系（如情感维系/确立盟友/仇敌）时，必须记录在发生的时间点上。
-3. 状态覆盖原则：叙述必须体现"新状态覆盖旧状态"的逻辑，使用如"从此开始"、"不再是"等定性词汇。
-4. 关键变动追踪：必须重点记录角色状态的突变（如怀孕/流产、残疾/康复、死亡/复活、失忆/恢复）及关系的根本性逆转（如结盟/决裂/恋爱,如从朋友到恋人、从陌生人到朋友、从恋人到分手、从盟友到背叛）时，必须记录在发生的时间点上。
-
-【核心指令：防遗忘与防瞎编协议】
-为了防止长期记忆混乱，你必须遵守以下最高优先级规则：
-1. 👁️ [在场人员全记录]：
-   - 任何事件的记录，必须在地点后或事件描述中明确谁在场。即使是配角或群众，只要在场就必须记录，防止后续剧情出现"幽灵角色"或"凭空消失"。
-   - 格式示例：...两人争吵，被路过的C目击。
-2. 💎 [拒绝模糊指代 - 信息实体化,拒绝概括性动词]：
-   - 严禁使用"那个秘密"、"真相"、"把柄"、"条件"、"承诺"、等模糊词汇。
-   - 必须将指代内容展开写明！。
-   - ❌ 错误：A用把柄威胁B，B同意了条件。
-   - ✅ 正确：A用[B私吞公款的账本]威胁B，B同意了[协助A运送私盐]的条件。
-   - ❌ 错误：A向B袒露了真相。
-   - ✅ 正确：A向B袒露了[自己其实是女儿身]的真相。
-   - 严禁单独使用“提供帮助”、“进行教导”、“予以安慰”、“实施救援”、“照顾”等概括性动词。
-   - ❌ 错误：A帮助了刚化为人形的B。
-   - ✅ 正确：A通过[充当支撑点并示范步伐]的方式，帮助[刚化为人形的B学习双足行走]。
-   - ❌ 错误：A安慰了哭泣的B。
-   - ✅ 正确：A通过[拥抱并承诺承担债务]安慰了哭泣的B。
-   - ❌ 错误：A教导B魔法。
-   - ✅ 正确：A指导B[感受魔力流动并念诵咒语]，教会了B[火球术]。
-3. ⏳ [前因后果闭环]：
-   - 记录事件时，必须包含：起因(具体的) -> 经过(含在场者/具体手段) -> 结果(具体的)。必须补全【具体手段/动作/内容】。另性行为无需具体行为细节，但必须包含起因、经过（重要的一些对话）、结果的闭环描述。
-
-
-<!-- 📝 第二部分：内容分类 -->
-
-【总结内容分类与归档原则】
-请严格执行"主线按日期、支线按人物/事件"的独立归档逻辑：
-
-1. 主线剧情（按日期归档）：
-   - 仅记录主角char与user的直接交互核心、主角char/user不与其他NPC的独处剧情、多个主角char之间的交互剧情。
-   - 格式：\`YYYY年MM月DD日·HH:mm-HH:mm [地点] 角色名 事件描述（必须包含事件导致的状态/关系变更结果）。
-   - 示例：YYYY年MM月DD日·09:00-10:30 [张氏大厦] 张三与李四达成和解，张三承诺"永远不再踏入赌坊"作为交换条件，双方关系由"敌对"转为"暂时盟友"。
-
-2. 支线剧情（按NPC/势力/事件归档 - 核心！）：
-   - 记录主角char/user和NPC互动剧情或NPC的独立行动。
-   - 严禁将不同NPC的支线按时间混写在一起！
-   - 必须以【NPC名字】+【特定事件名】为一级标题：\`【支线剧情：[NPC名字+事件名]】\`。
-   - 格式：\`HH:mm [地点] 角色名 精简事件描述（但必须包含事件导致的状态/关系变更结果）。
-
-【记忆总结·双轨聚合规则】
-
-1. 📅 日期归档原则：
-   - 同一日期的所有事件，合并在该标题下方。
-
-2. 📍时空合并逻辑：
-   - 【同地点聚合】：同一个地点且连贯的时间线内的所有连续剧情，必须合并成**唯一的一个段落**。严禁像流水账一样罗列时间点！只写总的"开始时间-结束时间"。
-   - 【跨回合提取】：如果一个连贯的事件（如A提出邀请 -> 穿插其他剧情 -> B最终接受）跨越了多个不连续的聊天回合，**你必须跨回合将其提取并合并为一段连贯的完整剧情**。严禁按聊天的楼层顺序切碎！
-
-
-3. 🚫 禁止事项：
-   - ❌ 绝对禁止的交叉流水账：
-     09:00 [酒馆] A问B要不要去冒险。
-     09:05[皇宫] 国王C正在密谋。
-     09:10 [酒馆] B同意了A的邀请。
-   - ✅ 唯一正确的按事件线聚合写法：
-     09:00-09:30[酒馆] A邀请B去冒险，经过一番交谈后，B同意了A的邀请。
-     09:00-09:30 [皇宫] 国王C密谋了某计划。（独立支线，单独成段）
-   - 严禁在支线剧情中混入主角char与user的直接互动。
-   - 严禁使用"表达了爱意"、"宣示主权"等抽象情感描述，只记录客观行为（如"赠送物品"、"强行带离"）。
-
-<!-- 📊 第三部分：输出范例 -->
-
-【✅ 正确输出范例】：
-   【主线剧情: YYYY年MM月DD日】
-   08:00-10:30 [地点A·教室] 角色A向角色B赠送了关键道具；角色C中途介入并带走角色B；
-   11:00-14:20 [地点B·别墅] 角色C限制了角色B的行动；角色D闯入打断；角色A最终抵达并将角色B带离；
-   19:00-22:00 [地点C·公寓] 四名角色集结，向角色B展示了不利证据，迫使其签署了《协议书》；随后众人在书房进行了多人互动。
-
-   【支线剧情：NPC甲名字+事件名】
-   YYYY年MM月DD日·00:00-23:59[地点D·办公室] NPC得知招收新人，回忆起自己大一时被拒的经历，认为此事必有隐情。
-
-   【主线剧情 YYYY年MM月DD日】
-   09:00-12:00 [地点D·医院] 角色B因身体不适就医，医生E伪造了诊断证明；角色A支付了医药费并将其带回。
-
-   【支线剧情：NPC甲名字+事件名】
-   YYYY年MM月DD日·18:03-19:00[地点E·档案室] 甲秘密销毁了关于角色B的旧档案，并通知了乙；
-
-   【支线剧情：NPC丙与丁名字+事件名】
-   YYYY年MM月DD日·13:00-14:00 [地点F·街道] 丙在跟踪角色A时被发现，随即销毁证据逃离；
-   YYYY年MM月DD日·23:00-23:30 [地点G·酒吧] 丁从丙处得知了白天的冲突事件，决定暂时隐匿行踪。`;
-
-    // ----- 3.5 聊天历史结束标记 + 执行指令 -----
-    const CHAT_HISTORY_END_MARKER = `--------------------------------------
-🛑 [对话历史结束]
---------------------------------------
-⚡ 立即开始执行：请从头到尾记录上述所有剧情，请严格遵守“主线按日期、支线按人物”的规则生成剧情总结。`;
 
     // ----- 4. 批量/追溯填表提示词 -----
     const DEFAULT_BACKFILL_PROMPT = `<!-- 🛑 第一部分:核心协议 -->
@@ -613,20 +313,6 @@ insertRow(0, {0: "YYYY年MM月DD日", 1: "凌晨(HH:mm)", 2: "", 3: "在古神�
 
 ⚡ 立即开始执行:请从头到尾记录并分析上述所有剧情,按照以上所有规则更新表格,将结果输出在<Memory>标签中.`;
 
-    // ----- 5. 总结优化提示词 -----
-    const DEFAULT_SUM_OPTIMIZE = `请对上述内容进行整合且精简优化，目标是生成类似小说梗概的连贯叙事。严格遵守以下核心协议：
-
-1. 【格式纯净】：严禁使用 Markdown 符号（如 #、*、-、>），严禁加粗。仅使用纯文本和标点符号。
-2. 【时空聚合】：强制合并主线剧情里同一个地点（如[山庄·主卧]）且连贯的时间线内的所有连续剧情，必须合并成**唯一的一个段落**。严禁像流水账一样罗列时间点！格式要求：只写总的"开始时间-结束时间"，中间的剧情全部用合适的标点符号或分号连接成一段完整的剧情。
-- 示例：
-     (原) 10:00-10:05 [山庄·客厅] A做了X。
-     (原) 10:05-10:30 [山庄·客厅] A又做了Y。
-     (改) 10:00-10:30 [山庄·客厅] A先做了X，随后做了Y。
-3. 【拒绝抽象】：严禁使用"宣示主权"、"暧昧气氛"、"心理博弈"等定义性词汇。必须保留具体的"行为动作"和"对话核心"来体现事情的前因后果及状态。
-4. 【因果完整】：严禁为了精简而删除前因后果。保留导致人物关系变化、状态变更（如死亡、受伤、恢复、移动、获得/丢失物品）的关键逻辑。
-5. 【客观口吻】：保持绝对客观的记录风格。
-6. 【多页面输出】：在输出时，不同页面的优化结果之间**必须**使用 \`---分隔线---\` 进行分割。严禁将它们合并成一段！请严格按照原文顺序输出。`;
-
     // ----- 6. AI 标签诊断提示词 -----
 const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤专家。你的任务是分析 AI 的回复文本，制定最优的标签过滤方案（黑名单或白名单）。
 
@@ -678,14 +364,8 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
     function getFallbackPromptDefaults() {
         return {
             nsfwPrompt: NSFW_UNLOCK,
-            tablePrompt: DEFAULT_TABLE_PROMPT,
-            tablePromptPos: 'system',
-            tablePromptPosType: 'system_end',
-            tablePromptDepth: 0,
             summaryPromptTable: DEFAULT_SUM_TABLE,
-            summaryPromptChat: DEFAULT_SUM_CHAT,
             backfillPrompt: DEFAULT_BACKFILL_PROMPT,
-            summaryPromptOptimize: DEFAULT_SUM_OPTIMIZE,
             promptVersion: PROMPT_VERSION
         };
     }
@@ -695,14 +375,8 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         const fallback = fallbackData || getFallbackPromptDefaults();
         return {
             nsfwPrompt: src.nsfwPrompt !== undefined ? src.nsfwPrompt : fallback.nsfwPrompt,
-            tablePrompt: src.tablePrompt !== undefined ? src.tablePrompt : fallback.tablePrompt,
-            tablePromptPos: src.tablePromptPos !== undefined ? src.tablePromptPos : fallback.tablePromptPos,
-            tablePromptPosType: src.tablePromptPosType !== undefined ? src.tablePromptPosType : fallback.tablePromptPosType,
-            tablePromptDepth: src.tablePromptDepth !== undefined ? src.tablePromptDepth : fallback.tablePromptDepth,
             summaryPromptTable: src.summaryPromptTable !== undefined ? src.summaryPromptTable : fallback.summaryPromptTable,
-            summaryPromptChat: src.summaryPromptChat !== undefined ? src.summaryPromptChat : fallback.summaryPromptChat,
             backfillPrompt: src.backfillPrompt !== undefined ? src.backfillPrompt : fallback.backfillPrompt,
-            summaryPromptOptimize: src.summaryPromptOptimize !== undefined ? src.summaryPromptOptimize : fallback.summaryPromptOptimize,
             promptVersion: PROMPT_VERSION
         };
     }
@@ -760,7 +434,6 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         const applySharedPromptUpdates = (data) => {
             const updated = normalizePromptDataShape(data, fallback);
             updated.nsfwPrompt = NSFW_UNLOCK;
-            updated.summaryPromptChat = DEFAULT_SUM_CHAT;
             updated.promptVersion = PROMPT_VERSION;
             return updated;
         };
@@ -1027,7 +700,20 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
     function normalizeProfilesData(data) {
         if (!data || typeof data !== 'object') return { data, touched: false };
 
-        const touched = ensureBuiltinPromptProfiles(data, { overwriteExisting: false });
+        let touched = ensureBuiltinPromptProfiles(data, { overwriteExisting: false });
+        const removedFields = [
+            'tablePrompt', 'tablePromptPos', 'tablePromptPosType', 'tablePromptDepth',
+            'summaryPromptChat', 'summaryPromptOptimize'
+        ];
+        Object.values(data.profiles || {}).forEach(profile => {
+            if (!profile?.data) return;
+            removedFields.forEach(field => {
+                if (Object.prototype.hasOwnProperty.call(profile.data, field)) {
+                    delete profile.data[field];
+                    touched = true;
+                }
+            });
+        });
 
         return { data, touched };
     }
@@ -1427,6 +1113,10 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
      * @returns {any} 提示词内容
      */
     function getCurrentPrompt(type) {
+        // 日常实时填表、聊天总结与总结优化已移除；追溯填表提示词仍保留。
+        if (['tablePrompt', 'summaryPromptChat', 'summaryPromptOptimize'].includes(type)) {
+            return '';
+        }
         const profilesData = getProfilesData() || initProfiles();
         const charName = getCurrentCharacterName();
 
@@ -1618,7 +1308,7 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                 }
 
                 await window.Gaigai.customAlert(`✅ 导入合并完成！\n\n📝 成功追加 ${addedPromptCount} 个【提示词预设】${msgSuffix}`, '导入成功');
-                showPromptManager(); // 刷新界面
+                showSummaryPromptManager(); // 刷新轻量提示词界面
             }
             
             // ==========================================
@@ -1672,7 +1362,7 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                 }
 
                 await window.Gaigai.customAlert(`✅ 提示词预设已成功导入并存为:【${finalProfileName}】\n${msgSuffix}\n\n💡 提示: 已自动为您切换到该预设。`, '导入成功');
-                showPromptManager(); // 刷新界面
+                showSummaryPromptManager(); // 刷新轻量提示词界面
             } 
             // 无法识别格式
             else {
@@ -1823,728 +1513,6 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
 
     /**
      * 显示提示词管理界面（重写版，支持多预设）
-     */
-    function showPromptManager() {
-        const profilesData = getProfilesData() || initProfiles();
-
-        // 获取当前角色名用于绑定功能
-        const charName = getCurrentCharacterName();
-
-        // ✅ 始终使用 profilesData.currentProfileId，允许用户自由切换编辑
-        const activeSelections = getActiveSelections();
-        let currentProfileId = activeSelections.activePromptProfileId || profilesData.currentProfileId || DEFAULT_PROMPT_PROFILE_ID;
-
-        // ✅ 如果当前角色有绑定预设，自动选中绑定的预设（仅影响本次渲染，不保存）
-        if (charName && profilesData.charBindings && profilesData.charBindings[charName]) {
-            currentProfileId = profilesData.charBindings[charName];
-            console.log(`[PromptManager] 角色 "${charName}" 已绑定预设 "${currentProfileId}"，自动选中`);
-        }
-
-        if (!profilesData.profiles[currentProfileId]) {
-            currentProfileId = DEFAULT_PROMPT_PROFILE_ID;
-            profilesData.currentProfileId = DEFAULT_PROMPT_PROFILE_ID;
-            saveActiveSelections({ activePromptProfileId: DEFAULT_PROMPT_PROFILE_ID });
-            saveProfilesData(profilesData);
-        }
-
-        const currentProfile = profilesData.profiles[currentProfileId];
-        const currentData = currentProfile.data;
-
-        // 检查当前预设是否绑定到当前角色
-        const isCharBound = charName && profilesData.charBindings[charName] === currentProfileId;
-
-        // 构建预设下拉列表
-        let profileOptions = '';
-        for (const [id, profile] of Object.entries(profilesData.profiles)) {
-            const selected = id === currentProfileId ? 'selected' : '';
-            profileOptions += `<option value="${id}" ${selected}>${window.Gaigai.esc(profile.name)}</option>`;
-        }
-
-        const isSel = (val, target) => val === target ? 'selected' : '';
-
-        const h = `<div class="g-p" style="display: flex; flex-direction: column; gap: 15px;">
-            <h4 style="margin:0 0 5px 0; opacity:0.8;">📝 提示词管理</h4>
-
-            <!-- 表格结构编辑器入口 (移到最上方) -->
-            <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,0.2);">
-                <div style="margin-bottom: 8px; font-weight: 600;">✏️ 表格结构管理</div>
-                <div style="font-size: 11px; color: #666; margin-bottom: 10px; line-height: 1.5;">
-                    自定义表格名称和列名（数据表可编辑，最后一个总结表锁定）。<br>
-                    <strong>⚠️ 修改表格结构后，需要手动更新提示词中的表格定义！</strong>
-                </div>
-                <button id="gg_open_table_editor_btn" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                    📝 打开表格结构编辑器
-                </button>
-            </div>
-
-            <div style="background: rgba(255,255,255,0.2); border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,0.3);">
-                <div style="display: flex; flex-wrap: wrap !important; gap: 8px; align-items: center; margin-bottom: 10px; max-width: 100%;">
-                    <label style="font-weight: 600; flex-shrink: 0;">📦 当前预设：</label>
-                    <select id="gg_profile_selector" style="flex: 1 1 auto; min-width: 150px; padding: 8px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.2); background: rgba(255,255,255,0.9); font-size: 12px;">
-                        ${profileOptions}
-                    </select>
-                    <button id="gg_new_profile_btn" style="padding: 8px 12px; background: #28a745; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; white-space: nowrap; flex: 1 0 auto;">➕ 新建</button>
-                    <button id="gg_rename_profile_btn" style="padding: 8px 12px; background: #17a2b8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; white-space: nowrap; flex: 1 0 auto;">✏️ 重命名</button>
-                    <button id="gg_delete_profile_btn" style="padding: 8px 12px; background: #dc3545; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; white-space: nowrap; flex: 1 0 auto;" ${isBuiltinProfileId(currentProfileId) ? 'disabled' : ''}>🗑️ 删除</button>
-                </div>
-
-                ${charName ? `
-                <div style="margin-bottom: 8px;">
-                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; margin-bottom: 4px;">
-                        <input type="checkbox" id="gg_bind_to_char" ${isCharBound ? 'checked' : ''} style="transform: scale(1.2);">
-                        <span>🔒 锁定为此角色专用 (切换角色时自动加载): <strong>"${window.Gaigai.esc(charName)}"</strong></span>
-                    </label>
-                    <div style="font-size: 10px; color: #666; opacity: 0.7; padding-left: 28px;">
-                        未勾选时，将使用全局通用的"当前预设"。
-                    </div>
-                </div>
-                ` : '<div style="font-size: 11px; opacity: 0.6;">💡 提示：进入对话后可绑定预设到特定角色</div>'}
-            </div>
-
-            <div style="display: flex; flex-wrap: wrap !important; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed rgba(0,0,0,0.1); max-width: 100%;">
-                <button id="gg_import_btn" style="flex: 1 1 auto; min-width: 90px; padding: 6px; background: ${window.Gaigai.ui.c}; opacity: 0.8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 11px;">📥 导入</button>
-                <button id="gg_export_single_btn" style="flex: 1 1 auto; min-width: 90px; padding: 6px; background: ${window.Gaigai.ui.c}; opacity: 0.8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 11px;">📤 导出当前</button>
-                <button id="gg_export_all_btn" style="flex: 1 1 auto; min-width: 90px; padding: 6px; background: ${window.Gaigai.ui.c}; opacity: 0.8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 11px;">📦 导出全部</button>
-            </div>
-            <input type="file" id="gg_import_file_input" accept=".json" style="display: none;" />
-            <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,0.2);">
-                <div style="margin-bottom: 8px; font-weight: 600;">🔓 史官破限 (System Pre-Prompt)</div>
-                <div style="font-size:10px; opacity:0.6; margin-bottom:10px;">用于总结/追溯等独立任务，不会在实时填表时发送</div>
-                <textarea id="gg_pmt_nsfw" style="width:100%; height:80px; padding:10px; border:1px solid rgba(0,0,0,0.1); border-radius:6px; font-size:11px; font-family:monospace; resize:vertical; background:rgba(255,255,255,0.5); box-sizing: border-box;">${window.Gaigai.esc(currentData.nsfwPrompt !== undefined ? currentData.nsfwPrompt : NSFW_UNLOCK)}</textarea>
-            </div>
-
-            <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,0.2);">
-                <div style="margin-bottom: 8px; font-weight: 600; display:flex; justify-content:space-between; align-items:center;">
-                    <span>📋 填表提示词</span>
-                    <div style="display: flex; background: rgba(127, 127, 127, 0.15); padding: 4px; border-radius: 8px; gap: 4px; flex-wrap: wrap;">
-                        <label style="flex: 1; text-align: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: ${window.Gaigai.ui.tc}; opacity: 0.7; display: flex; align-items: center; border: 1px solid transparent;">
-                            <input type="radio" name="pmt-record-type" value="realtime" checked data-was-checked="true">
-                            📋 实时填表
-                        </label>
-                        <label style="flex: 1; text-align: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: ${window.Gaigai.ui.tc}; opacity: 0.7; display: flex; align-items: center; border: 1px solid transparent;">
-                            <input type="radio" name="pmt-record-type" value="backfill">
-                            ⚡ 批量追溯
-                        </label>
-                    </div>
-                </div>
-                <textarea id="gg_pmt_record" style="width:100%; height:150px; padding:10px; border:1px solid rgba(0,0,0,0.1); border-radius:6px; font-size:12px; font-family:monospace; resize:vertical; background:rgba(255,255,255,0.5); box-sizing: border-box; margin-bottom: 4px;">${window.Gaigai.esc(currentData.tablePrompt !== undefined ? currentData.tablePrompt : DEFAULT_TABLE_PROMPT)}</textarea>
-                <div style="font-size:10px; opacity:0.5; text-align:right;" id="gg_pmt_record_desc">当前编辑：修改实时填表/批量填表提示词</div>
-            </div>
-
-            <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,0.2);">
-                <div style="margin-bottom: 8px; font-weight: 600; display:flex; justify-content:space-between; align-items:center;">
-                    <span>📝 总结/优化提示词</span>
-                    <div style="display: flex; background: rgba(127, 127, 127, 0.15); padding: 4px; border-radius: 8px; gap: 4px; flex-wrap: wrap;">
-                        <label style="flex: 1; text-align: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: ${window.Gaigai.ui.tc}; opacity: 0.7; display: flex; align-items: center; border: 1px solid transparent;">
-                            <input type="radio" name="pmt-sum-type" value="table" checked data-was-checked="true">
-                            📊 表格总结
-                        </label>
-                        <label style="flex: 1; text-align: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: ${window.Gaigai.ui.tc}; opacity: 0.7; display: flex; align-items: center; border: 1px solid transparent;">
-                            <input type="radio" name="pmt-sum-type" value="chat">
-                            💬 聊天总结
-                        </label>
-                        <label style="flex: 1; text-align: center; justify-content: center; padding: 6px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; transition: all 0.2s; color: ${window.Gaigai.ui.tc}; opacity: 0.7; display: flex; align-items: center; border: 1px solid transparent;">
-                            <input type="radio" name="pmt-sum-type" value="optimize">
-                            ✨ 总结优化
-                        </label>
-                    </div>
-                </div>
-                <textarea id="gg_pmt_summary" style="width:100%; height:120px; padding:10px; border:1px solid rgba(0,0,0,0.1); border-radius:6px; font-size:12px; font-family:monospace; resize:vertical; background:rgba(255,255,255,0.5); box-sizing: border-box;"></textarea>
-                <div style="font-size:10px; opacity:0.5; margin-top:4px; text-align:right;" id="gg_pmt_desc">当前编辑：修改总结及总结优化提示词</div>
-            </div>
-
-            <!-- 保存/恢复按钮组 -->
-            <div style="display: flex; gap: 10px; margin-top: 5px;">
-                <button id="gg_reset_pmt" style="flex:1; background:rgba(108, 117, 125, 0.8); font-size:12px; padding:10px; border-radius:6px; color:#fff; border:none; cursor:pointer;">🔄 恢复默认</button>
-                <button id="gg_save_pmt" style="flex:2; padding:10px; font-weight:bold; font-size:13px; border-radius:6px; background:linear-gradient(135deg, #28a745 0%, #20c997 100%); color:#fff; border:none; cursor:pointer;">💾 保存设置</button>
-            </div>
-        </div>`;
-
-        window.Gaigai.pop('📝 提示词管理', h, true);
-
-        setTimeout(() => {
-            // 初始化填表组变量
-            let tempRealtimePmt = currentData.tablePrompt !== undefined ? currentData.tablePrompt : DEFAULT_TABLE_PROMPT;
-            let tempBackfillPmt = currentData.backfillPrompt !== undefined ? currentData.backfillPrompt : DEFAULT_BACKFILL_PROMPT;
-
-            // 初始化总结组变量
-            let tempTablePmt = currentData.summaryPromptTable !== undefined ? currentData.summaryPromptTable : DEFAULT_SUM_TABLE;
-            let tempChatPmt = currentData.summaryPromptChat !== undefined ? currentData.summaryPromptChat : DEFAULT_SUM_CHAT;
-            let tempOptimizePmt = currentData.summaryPromptOptimize !== undefined ? currentData.summaryPromptOptimize : DEFAULT_SUM_OPTIMIZE;
-
-            // 初始化下方总结文本框内容
-            $('#gg_pmt_summary').val(tempTablePmt);
-
-            // 预设切换
-            $('#gg_profile_selector').on('change', async function () {
-                const newProfileId = $(this).val();
-                profilesData.currentProfileId = newProfileId;
-                saveActiveSelections({ activePromptProfileId: newProfileId });
-
-                // ✅ 修复：若当前角色处于“锁定绑定”状态，切换下拉时同步更新绑定目标
-                // 否则 showPromptManager() 会按旧绑定把下拉框又切回去，造成“选了不显示”
-                if (charName && $('#gg_bind_to_char').is(':checked')) {
-                    profilesData.charBindings[charName] = newProfileId;
-                }
-
-                saveProfilesData(profilesData);
-
-                // ✅ 仅内置四方案做联动：切换提示词时自动切对应表格结构
-                if (isBuiltinProfileId(newProfileId)) {
-                    await applyBuiltinLinkedTablePreset(newProfileId);
-                }
-
-                showPromptManager(); // 重新打开界面
-            });
-
-            // 新建预设
-            $('#gg_new_profile_btn').on('click', async function () {
-                const name = await customPrompt('请输入新预设名称：', '我的预设');
-                if (!name) return;
-
-                const newId = 'profile_' + Date.now();
-                // ✅ 创建纯白空白模板（所有提示词为空字符串）
-                const blankTemplate = {
-                    nsfwPrompt: '',
-                    tablePrompt: '',
-                    tablePromptPos: 'system',
-                    tablePromptPosType: 'system_end',
-                    tablePromptDepth: 0,
-                    summaryPromptTable: '',
-                    summaryPromptChat: '',
-                    backfillPrompt: '',
-                    summaryPromptOptimize: '',
-                    promptVersion: PROMPT_VERSION
-                };
-                profilesData.profiles[newId] = {
-                    name: name,
-                    data: blankTemplate
-                };
-                profilesData.currentProfileId = newId;
-                saveActiveSelections({ activePromptProfileId: newId });
-                saveProfilesData(profilesData);
-
-                // ✅ 更新时间戳，防止被后台同步覆盖
-                localStorage.setItem('gg_timestamp', Date.now().toString());
-
-                // 🔄 同步到云端
-                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                    await window.Gaigai.saveAllSettingsToCloud();
-                }
-
-                await window.Gaigai.customAlert('✅ 新预设已创建！', '成功');
-                showPromptManager();
-            });
-
-            // 重命名预设
-            $('#gg_rename_profile_btn').on('click', async function () {
-                if (isBuiltinProfileId(currentProfileId)) {
-                    await window.Gaigai.customAlert('❌ 内置默认方案不可重命名', '提示');
-                    return;
-                }
-
-                const newName = await customPrompt('请输入新名称：', currentProfile.name);
-                if (!newName) return;
-                if (newName === currentProfile.name) return;
-
-                const duplicated = Object.entries(profilesData.profiles).some(([id, profile]) => {
-                    if (id === currentProfileId) return false;
-                    return profile && profile.name === newName;
-                });
-                if (duplicated) {
-                    if (typeof toastr !== 'undefined') {
-                        toastr.warning(`已存在同名预设：${newName}`, '重命名失败');
-                    } else {
-                        await window.Gaigai.customAlert(`已存在同名预设：${newName}`, '重命名失败');
-                    }
-                    return;
-                }
-
-                currentProfile.name = newName;
-                saveProfilesData(profilesData);
-
-                // ✅ 更新时间戳，防止被后台同步覆盖
-                localStorage.setItem('gg_timestamp', Date.now().toString());
-
-                // 🔄 同步到云端
-                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                    await window.Gaigai.saveAllSettingsToCloud();
-                }
-
-                // 原地更新 UI，避免“再次弹窗/重开窗口”
-                $('#gg_profile_selector option:selected').text(newName);
-                if (typeof toastr !== 'undefined') {
-                    toastr.success('预设已重命名', '成功');
-                }
-            });
-
-            // 删除预设
-            $('#gg_delete_profile_btn').on('click', async function () {
-                if (isBuiltinProfileId(currentProfileId)) {
-                    await window.Gaigai.customAlert('❌ 内置默认方案不可删除！', '错误');
-                    return;
-                }
-
-                const confirmed = await window.Gaigai.customConfirm(`确定要删除预设 "${currentProfile.name}" 吗？\n\n此操作不可恢复！`, '删除确认');
-                if (!confirmed) return;
-
-                delete profilesData.profiles[currentProfileId];
-
-                // 清理绑定关系
-                for (const [charName, boundId] of Object.entries(profilesData.charBindings)) {
-                    if (boundId === currentProfileId) {
-                        delete profilesData.charBindings[charName];
-                    }
-                }
-
-                profilesData.currentProfileId = DEFAULT_PROMPT_PROFILE_ID;
-                saveActiveSelections({ activePromptProfileId: DEFAULT_PROMPT_PROFILE_ID });
-                saveProfilesData(profilesData);
-
-                // ✅ 更新时间戳，防止被后台同步覆盖
-                localStorage.setItem('gg_timestamp', Date.now().toString());
-
-                // 🔄 同步到云端
-                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                    await window.Gaigai.saveAllSettingsToCloud();
-                    console.log('[PromptManager] Deletion synced to cloud');
-                }
-
-                await window.Gaigai.customAlert('✅ 预设已删除！', '成功');
-                showPromptManager();
-            });
-
-            // 角色绑定
-            if (charName) {
-                $('#gg_bind_to_char').on('change', async function () {
-                    if ($(this).is(':checked')) {
-                        profilesData.charBindings[charName] = currentProfileId;
-                        console.log(`[PromptManager] 已绑定角色 "${charName}" 到预设 "${currentProfileId}"`);
-
-                        if (isBuiltinProfileId(currentProfileId)) {
-                            await applyBuiltinLinkedTablePreset(currentProfileId);
-                        }
-                    } else {
-                        delete profilesData.charBindings[charName];
-                        console.log(`[PromptManager] 已解除角色 "${charName}" 的绑定`);
-                    }
-                    saveProfilesData(profilesData);
-
-                    // 🔄 同步到云端
-                    if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                        window.Gaigai.saveAllSettingsToCloud();
-                    }
-                });
-            }
-
-            // === 填表组 切换事件 ===
-            $('input[name="pmt-record-type"]').on('change', function () {
-                const type = $(this).val();
-                const currentVal = $('#gg_pmt_record').val();
-                const prevType = $('input[name="pmt-record-type"]').not(this).filter((i, el) => $(el).data('was-checked')).val() || 'realtime';
-
-                // 保存旧值
-                if (prevType === 'realtime') tempRealtimePmt = currentVal;
-                else if (prevType === 'backfill') tempBackfillPmt = currentVal;
-
-                // 加载新值
-                if (type === 'realtime') {
-                    $('#gg_pmt_record').val(tempRealtimePmt);
-                    $('#gg_pmt_record_desc').text('当前编辑：每回合自动触发的实时填表指令');
-                } else if (type === 'backfill') {
-                    $('#gg_pmt_record').val(tempBackfillPmt);
-                    $('#gg_pmt_record_desc').text('当前编辑：批量/追溯历史记录的填表指令');
-                }
-
-                $('input[name="pmt-record-type"]').data('was-checked', false);
-                $(this).data('was-checked', true);
-            });
-
-            $('#gg_pmt_record').on('input blur', function () {
-                const type = $('input[name="pmt-record-type"]:checked').val() || 'realtime';
-                if (type === 'realtime') tempRealtimePmt = $(this).val();
-                else if (type === 'backfill') tempBackfillPmt = $(this).val();
-            });
-
-            // === 总结组 切换事件 ===
-            $('input[name="pmt-sum-type"]').on('change', function () {
-                const type = $(this).val();
-                const currentVal = $('#gg_pmt_summary').val();
-                const prevType = $('input[name="pmt-sum-type"]').not(this).filter((i, el) => $(el).data('was-checked')).val() || 'table';
-
-                // 保存旧值
-                if (prevType === 'table') tempTablePmt = currentVal;
-                else if (prevType === 'chat') tempChatPmt = currentVal;
-                else if (prevType === 'optimize') tempOptimizePmt = currentVal;
-
-                // 加载新值
-                if (type === 'table') {
-                    $('#gg_pmt_summary').val(tempTablePmt);
-                    $('#gg_pmt_desc').text('当前编辑：基于记忆表格数据的总结指令');
-                } else if (type === 'chat') {
-                    $('#gg_pmt_summary').val(tempChatPmt);
-                    $('#gg_pmt_desc').text('当前编辑：基于聊天历史记录的总结指令');
-                } else if (type === 'optimize') {
-                    $('#gg_pmt_summary').val(tempOptimizePmt);
-                    $('#gg_pmt_desc').text('💡 用于精简和润色已生成的总结内容');
-                }
-
-                $('input[name="pmt-sum-type"]').data('was-checked', false);
-                $(this).data('was-checked', true);
-            });
-
-            $('#gg_pmt_summary').on('input blur', function () {
-                const type = $('input[name="pmt-sum-type"]:checked').val() || 'table';
-                if (type === 'table') tempTablePmt = $(this).val();
-                else if (type === 'chat') tempChatPmt = $(this).val();
-                else if (type === 'optimize') tempOptimizePmt = $(this).val();
-            });
-
-            // 保存按钮
-            $('#gg_save_pmt').on('click', async function () {
-                $('#gg_pmt_record').trigger('blur');
-                $('#gg_pmt_summary').trigger('blur');
-
-                // 更新当前预设的数据
-                currentData.nsfwPrompt = $('#gg_pmt_nsfw').val();
-                currentData.tablePrompt = tempRealtimePmt;
-                currentData.backfillPrompt = tempBackfillPmt;
-                currentData.summaryPromptTable = tempTablePmt;
-                currentData.summaryPromptChat = tempChatPmt;
-                currentData.summaryPromptOptimize = tempOptimizePmt;
-                currentData.promptVersion = PROMPT_VERSION;
-
-                delete currentData.summaryPrompt; // 移除旧字段
-
-                // 显式记录当前激活状态，避免下次面板重置到首项
-                const latestActive = getActiveSelections();
-                saveActiveSelections({
-                    activePromptProfileId: currentProfileId,
-                    activeTablePresetName: latestActive.activeTablePresetName || ''
-                });
-
-                // 保存到 localStorage（静默失败，不阻断云端同步）
-                const localSaveSuccess = saveProfilesData(profilesData);
-
-                // ✅ 更新时间戳，防止被后台同步覆盖（同样静默失败）
-                try {
-                    localStorage.setItem('gg_timestamp', Date.now().toString());
-                } catch (e) {
-                    console.warn('[PromptManager] ⚠️ 时间戳写入失败:', e.message || e);
-                }
-
-                // ✅ 显式更新全局配置对象
-                window.Gaigai.config_obj.profiles = profilesData;
-
-                // 同步到云端（如果 saveAllSettingsToCloud 存在）- 这是主要的持久化方式
-                let cloudSaveSuccess = false;
-                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                    try {
-                        await window.Gaigai.saveAllSettingsToCloud();
-                        cloudSaveSuccess = true;
-                    } catch (e) {
-                        console.error('[PromptManager] 云端同步失败:', e);
-                    }
-                }
-
-                // 根据保存结果显示不同提示
-                if (cloudSaveSuccess) {
-                    await window.Gaigai.customAlert('✅ 提示词配置已保存！' + (localSaveSuccess ? '' : '\n(本地缓存已满，已同步到云端)'), '成功');
-                } else if (localSaveSuccess) {
-                    await window.Gaigai.customAlert('✅ 提示词配置已保存到本地！\n(云端同步不可用)', '成功');
-                } else {
-                    await window.Gaigai.customAlert('⚠️ 保存遇到问题，请检查存储空间', '警告');
-                }
-            });
-
-            // 打开表格结构编辑器按钮
-            $('#gg_open_table_editor_btn').on('click', function () {
-                window.Gaigai.navTo('表格结构编辑器', showTableEditor);
-            });
-
-            // 恢复默认按钮
-            $('#gg_reset_pmt').on('click', async function () {
-                const confirmHtml = `
-                    <div class="g-p">
-                        <div style="margin-bottom:12px; color:#666; font-size:12px;">请勾选需要恢复默认的项目：</div>
-
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; background:var(--g-c); border:1px solid rgba(255,255,255,0.2); padding:8px; border-radius:6px;">
-                            <input type="checkbox" id="gg_rst_nsfw" checked style="transform:scale(1.2);">
-                            <div>
-                                <div style="font-weight:bold;">🔓 史官破限提示词</div>
-                                <div style="font-size:10px; opacity:0.8;">(NSFW Unlock)</div>
-                            </div>
-                        </label>
-
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; background:var(--g-c); border:1px solid rgba(255,255,255,0.2); padding:8px; border-radius:6px;">
-                            <input type="checkbox" id="gg_rst_table" checked style="transform:scale(1.2);">
-                            <div>
-                                <div style="font-weight:bold;">📋 实时填表提示词</div>
-                                <div style="font-size:10px; opacity:0.8;">(Memory Guide - Realtime)</div>
-                            </div>
-                        </label>
-
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; background:var(--g-c); border:1px solid rgba(255,255,255,0.2); padding:8px; border-radius:6px;">
-                            <input type="checkbox" id="gg_rst_sum-table" checked style="transform:scale(1.2);">
-                            <div>
-                                <div style="font-weight:bold;">📊 表格总结提示词</div>
-                                <div style="font-size:10px; opacity:0.8;">(Summary - Table Mode)</div>
-                            </div>
-                        </label>
-
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; background:var(--g-c); border:1px solid rgba(255,255,255,0.2); padding:8px; border-radius:6px;">
-                            <input type="checkbox" id="gg_rst_sum-chat" checked style="transform:scale(1.2);">
-                            <div>
-                                <div style="font-weight:bold;">💬 聊天总结提示词</div>
-                                <div style="font-size:10px; opacity:0.8;">(Summary - Chat Mode)</div>
-                            </div>
-                        </label>
-
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; background:var(--g-c); border:1px solid rgba(255,255,255,0.2); padding:8px; border-radius:6px;">
-                            <input type="checkbox" id="gg_rst_backfill" checked style="transform:scale(1.2);">
-                            <div>
-                                <div style="font-weight:bold;">⚡ 批量填表提示词</div>
-                                <div style="font-size:10px; opacity:0.8;">(Backfill - History Mode)</div>
-                            </div>
-                        </label>
-
-                        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; background:var(--g-c); border:1px solid rgba(255,255,255,0.2); padding:8px; border-radius:6px;">
-                            <input type="checkbox" id="gg_rst_optimize" checked style="transform:scale(1.2);">
-                            <div>
-                                <div style="font-weight:bold;">✨ 总结优化提示词</div>
-                                <div style="font-size:10px; opacity:0.8;">(Summary Optimization)</div>
-                            </div>
-                        </label>
-
-                        <div style="margin-top:15px; display:flex; gap:10px;">
-                            <button id="gg_confirm_reset_btn" style="flex:1; padding:10px; background:#dc3545; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">确认恢复</button>
-                            <button id="gg_cancel_reset_btn" style="flex:1; padding:10px; background:#6c757d; color:#fff; border:none; border-radius:6px; cursor:pointer;">取消</button>
-                        </div>
-                    </div>
-                `;
-
-                window.Gaigai.pop('🔄 恢复默认提示词', confirmHtml, true);
-
-                setTimeout(() => {
-                    $('#gg_confirm_reset_btn').on('click', async function () {
-                        const resetFlags = {
-                            nsfw: $('#gg_rst_nsfw').is(':checked'),
-                            table: $('#gg_rst_table').is(':checked'),
-                            sumTable: $('#gg_rst_sum-table').is(':checked'),
-                            sumChat: $('#gg_rst_sum-chat').is(':checked'),
-                            backfill: $('#gg_rst_backfill').is(':checked'),
-                            optimize: $('#gg_rst_optimize').is(':checked')
-                        };
-
-                        // ✅ 恢复默认时，四套内置方案一起同步到最新预制版本
-                        for (const spec of BUILTIN_PROFILE_SPECS) {
-                            const profile = profilesData.profiles[spec.id];
-                            if (!profile) continue;
-
-                            const defaults = getBuiltinDefaultPromptData(spec);
-                            const data = normalizePromptDataShape(profile.data, defaults);
-
-                            if (resetFlags.nsfw) data.nsfwPrompt = defaults.nsfwPrompt;
-                            if (resetFlags.table) data.tablePrompt = defaults.tablePrompt;
-                            if (resetFlags.sumTable) data.summaryPromptTable = defaults.summaryPromptTable;
-                            if (resetFlags.sumChat) data.summaryPromptChat = defaults.summaryPromptChat;
-                            if (resetFlags.backfill) data.backfillPrompt = defaults.backfillPrompt;
-                            if (resetFlags.optimize) data.summaryPromptOptimize = defaults.summaryPromptOptimize;
-                            data.promptVersion = PROMPT_VERSION;
-
-                            profile.data = data;
-                            profile.name = spec.name;
-                        }
-
-                        saveProfilesData(profilesData);
-
-                        // 刷新当前页临时变量，避免视觉残留
-                        const latestCurrentData = profilesData.profiles[currentProfileId]?.data || currentData;
-                        tempRealtimePmt = latestCurrentData.tablePrompt || tempRealtimePmt;
-                        tempBackfillPmt = latestCurrentData.backfillPrompt || tempBackfillPmt;
-                        tempTablePmt = latestCurrentData.summaryPromptTable || tempTablePmt;
-                        tempChatPmt = latestCurrentData.summaryPromptChat || tempChatPmt;
-                        tempOptimizePmt = latestCurrentData.summaryPromptOptimize || tempOptimizePmt;
-
-                        // 云端同步
-                        localStorage.setItem('gg_timestamp', Date.now().toString());
-                        if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                            await window.Gaigai.saveAllSettingsToCloud();
-                        }
-
-                        await window.Gaigai.customAlert('✅ 已按选择项同步恢复四套默认提示词方案。', '成功');
-                        showPromptManager();
-                    });
-
-                    $('#gg_cancel_reset_btn').on('click', function () {
-                        showPromptManager();
-                    });
-                }, 50);
-            });
-
-            // 导入/导出功能
-            // 导出当前预设按钮
-            // 导出当前预设按钮
-            $('#gg_export_single_btn').on('click', function () {
-                // ✨ 修复：强制触发失焦，抓取当前输入框里最新、哪怕还没保存的提示词数据
-                $('#gg_pmt_record').trigger('blur');
-                $('#gg_pmt_summary').trigger('blur');
-
-                const latestData = JSON.parse(JSON.stringify(currentData));
-                latestData.nsfwPrompt = $('#gg_pmt_nsfw').val();
-                latestData.tablePrompt = tempRealtimePmt;
-                latestData.backfillPrompt = tempBackfillPmt;
-                latestData.summaryPromptTable = tempTablePmt;
-                latestData.summaryPromptChat = tempChatPmt;
-                latestData.summaryPromptOptimize = tempOptimizePmt;
-
-                // 1. ✅ 获取当前会话实际使用的表格结构（而不是全局配置）
-                const m = window.Gaigai.m;
-                const currentTableConfig = m.all().map(s => ({
-                    n: s.n,
-                    c: [...s.c] // 深拷贝列数组
-                }));
-
-                // 2. 直接读取显式激活状态，不再做结构深度对比猜测
-                const activeSelections = getActiveSelections();
-                let structureName = activeSelections.activeTablePresetName || '自定义结构';
-
-                console.log(`📤 [导出提示词] 当前表格结构: ${structureName}`);
-
-                const exportData = {
-                    name: currentProfile.name,
-                    data: latestData, // ✨ 修复：使用包含了最新文本框修改的数据
-                    linkedTableStructure: currentTableConfig,
-                    structureName: structureName
-                };
-
-                // ✨ 修复：优化导出的文件命名，直接用提示词的名称打头
-                const filename = `${currentProfile.name}_提示词与表格备份_${Date.now()}.json`;
-                downloadJson(exportData, filename);
-            });
-
-            // 导出全部预设
-            $('#gg_export_all_btn').on('click', function() {
-                // 强制触发失焦
-                $('#gg_pmt_record').trigger('blur');
-                $('#gg_pmt_summary').trigger('blur');
-
-                currentData.nsfwPrompt = $('#gg_pmt_nsfw').val();
-                currentData.tablePrompt = tempRealtimePmt;
-                currentData.backfillPrompt = tempBackfillPmt;
-                currentData.summaryPromptTable = tempTablePmt;
-                currentData.summaryPromptChat = tempChatPmt;
-                currentData.summaryPromptOptimize = tempOptimizePmt;
-
-                // ✨ 核心修复：深拷贝提示词数据，并把所有【表格结构预设】也硬塞进去一起打包！
-                const exportData = JSON.parse(JSON.stringify(profilesData));
-                exportData.tablePresets = getTablePresets();
-
-                const filename = `${currentProfile.name}_及全部预设备份_${Date.now()}.json`;
-                downloadJson(exportData, filename); // 导出包含了表格结构的完整包
-            });
-
-            // 导入按钮
-            $('#gg_import_btn').on('click', function () {
-                $('#gg_import_file_input').click();
-            });
-
-            // 文件选择处理
-            $('#gg_import_file_input').on('change', async function (e) {
-                const file = e.target.files[0];
-                if (file) {
-                    await handleImport(file);
-                    $(this).val(''); // 重置输入框，允许重复导入同一文件
-                }
-            });
-        }, 50);
-    }
-
-    /**
-     * 检查并执行提示词更新
-     * 当代码中的 PROMPT_VERSION 更新时，提示用户更新默认提示词
-     */
-    async function checkAndExecutePromptUpdate() {
-        try {
-            // 1. 获取当前代码中的版本号
-            const currentVersion = PROMPT_VERSION;
-
-            // 2. 读取预设数据，获取存储的版本号（默认为0）
-            // ✅ 从 profilesData.system_prompt_version 读取（云端同步）
-            let profilesData = getProfilesData() || initProfiles();
-            const localVersion = parseFloat(profilesData.system_prompt_version) || 0;
-
-            // 3. 判断是否需要更新
-            if (currentVersion <= localVersion) {
-                console.log(`[PromptManager] 提示词版本检查: v${currentVersion} (已是最新)`);
-                return;
-            }
-
-            console.log(`[PromptManager] 检测到提示词更新: v${localVersion} -> v${currentVersion}`);
-
-            // 4. 弹窗询问用户
-            const userConfirmed = await window.Gaigai.customConfirm(
-                `📢 提示词库更新 (v${currentVersion})\n\n检测到开发者优化了默认提示词/表格结构。\n是否一键同步【四套内置默认方案】到最新版本？\n\n🛡️ 安全提示：您的自定义预设和角色绑定不会受到任何影响。`,
-                '提示词更新'
-            );
-
-            // 5. ⚠️ 无论用户选择什么，都要立即更新版本号，防止重复弹窗
-            // ✅ 保存到 profilesData.system_prompt_version（云端同步）
-            profilesData.system_prompt_version = currentVersion;
-            saveProfilesData(profilesData);
-            console.log(`[PromptManager] 已更新版本号为: v${currentVersion}`);
-
-            // 5.1 立即同步到云端，确保版本号持久化
-            if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                await window.Gaigai.saveAllSettingsToCloud();
-                console.log('[PromptManager] 版本号已同步到云端');
-            }
-
-            // 6. 如果用户点击取消，直接返回
-            if (!userConfirmed) {
-                console.log('[PromptManager] 用户取消了更新操作');
-                return;
-            }
-
-            // 7. 用户确认更新：四套默认提示词 + 四套默认结构 一键同步
-            console.log('[PromptManager] 开始同步四套内置默认方案...');
-
-            ensureBuiltinPromptProfiles(profilesData, { overwriteExisting: true });
-            saveProfilesData(profilesData);
-
-            const tableSync = ensureBuiltinTablePresetBundle(getTablePresets(), { overwriteExisting: true });
-            if (tableSync.touched) {
-                saveTablePresets(tableSync.tablePresets);
-            }
-
-            if (isBuiltinProfileId(profilesData.currentProfileId)) {
-                await applyBuiltinLinkedTablePreset(profilesData.currentProfileId);
-            }
-
-            console.log('[PromptManager] 四套默认方案已更新');
-
-            // 7.5 云端同步（如果可用）
-            if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                await window.Gaigai.saveAllSettingsToCloud();
-                console.log('[PromptManager] 已同步到云端');
-            }
-
-            // 7.6 弹出成功提示
-            await window.Gaigai.customAlert('✅ 四套默认方案已更新成功！\n\n您可以前往"配置 → 提示词"查看最新内容。', '更新成功');
-
-            // 7.7 如果当前正处于提示词管理界面，刷新界面
-            if ($('#gg_profile_selector').length > 0) {
-                console.log('[PromptManager] 刷新提示词管理界面...');
-                showPromptManager();
-            }
-
-        } catch (error) {
-            console.error('[PromptManager] 检查更新时出错:', error);
-        }
-    }
-
-    /**
-     * 显示表格编辑器（多预设管理模式 - 重构版）
      */
     function showTableEditor() {
         const C = window.Gaigai.config_obj;
@@ -3251,6 +2219,62 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
     // 挂载到全局对象
     // ========================================================================
 
+    function showSummaryPromptManager() {
+        const UI = window.Gaigai.ui;
+        const summaryPrompt = getCurrentPrompt('summaryPromptTable') || '';
+        const backfillPrompt = getCurrentPrompt('backfillPrompt') || DEFAULT_BACKFILL_PROMPT;
+        const nsfwPrompt = getCurrentPrompt('nsfwPrompt') || '';
+        const html = `
+            <div class="g-p" style="display:flex;flex-direction:column;gap:12px;height:100%;box-sizing:border-box;">
+                <button id="gg_open_table_editor_light" style="padding:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer;">
+                    ✏️ 打开表格结构编辑器
+                </button>
+                <div style="font-size:11px;color:${UI.tc};opacity:.75;">
+                    保留记忆表格总结与手动剧情追溯提示词；日常实时填表、聊天总结、大总结和总结优化已停用。
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;margin-bottom:6px;color:${UI.tc};">表格总结提示词</label>
+                    <textarea id="gg_summary_prompt_only" style="width:100%;height:34vh;box-sizing:border-box;padding:9px;resize:vertical;font-family:monospace;">${String(summaryPrompt).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;margin-bottom:6px;color:${UI.tc};">剧情追溯填表提示词</label>
+                    <textarea id="gg_backfill_prompt_only" style="width:100%;height:28vh;box-sizing:border-box;padding:9px;resize:vertical;font-family:monospace;">${String(backfillPrompt).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;margin-bottom:6px;color:${UI.tc};">总结模型系统提示词（可选）</label>
+                    <textarea id="gg_summary_nsfw_only" style="width:100%;height:18vh;box-sizing:border-box;padding:9px;resize:vertical;font-family:monospace;">${String(nsfwPrompt).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                </div>
+                <button id="gg_save_summary_prompts_only" style="padding:10px;background:#4caf50;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer;">保存提示词</button>
+            </div>`;
+        window.Gaigai.pop('🧠 总结提示词', html, true);
+
+        setTimeout(() => {
+            $('#gg_open_table_editor_light').off('click').on('click', function () {
+                window.Gaigai.navTo('表格结构编辑器', showTableEditor);
+            });
+            $('#gg_save_summary_prompts_only').off('click').on('click', async function () {
+                const profilesData = getProfilesData() || initProfiles();
+                const charName = getCurrentCharacterName();
+                let profileId = profilesData.currentProfileId || DEFAULT_PROMPT_PROFILE_ID;
+                if (charName && profilesData.charBindings?.[charName]) profileId = profilesData.charBindings[charName];
+                const profile = profilesData.profiles[profileId] || profilesData.profiles[DEFAULT_PROMPT_PROFILE_ID];
+                if (!profile || !profile.data) {
+                    await window.Gaigai.customAlert('当前总结提示词预设不可用。', '保存失败');
+                    return;
+                }
+                profile.data.summaryPromptTable = String($('#gg_summary_prompt_only').val() || '').trim();
+                profile.data.backfillPrompt = String($('#gg_backfill_prompt_only').val() || '').trim();
+                profile.data.nsfwPrompt = String($('#gg_summary_nsfw_only').val() || '').trim();
+                saveProfilesData(profilesData);
+                if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
+                    await window.Gaigai.saveAllSettingsToCloud();
+                }
+                await window.Gaigai.customAlert('总结与追溯提示词已保存。', '保存成功');
+            });
+        }, 100);
+    }
+
     window.Gaigai.PromptManager = {
         // 核心方法
         get: getCurrentPrompt,              // 获取特定类型的提示词
@@ -3271,19 +2295,15 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         getUniquePresetName: getUniquePresetName,
 
         // UI 函数
-        showPromptManager: showPromptManager,
+        showPromptManager: showSummaryPromptManager,
         showTableEditor: showTableEditor,
 
         // UI 辅助函数
         customPrompt: customPrompt,         // ✅ 自定义输入弹窗
 
         // 默认提示词常量（供外部引用）
-        DEFAULT_TABLE_PROMPT: DEFAULT_TABLE_PROMPT,
         DEFAULT_SUM_TABLE: DEFAULT_SUM_TABLE,
-        DEFAULT_SUM_CHAT: DEFAULT_SUM_CHAT,
-        CHAT_HISTORY_END_MARKER: CHAT_HISTORY_END_MARKER,
         DEFAULT_BACKFILL_PROMPT: DEFAULT_BACKFILL_PROMPT,
-        DEFAULT_SUM_OPTIMIZE: DEFAULT_SUM_OPTIMIZE,
         NSFW_UNLOCK: NSFW_UNLOCK,
         AI_TAG_DIAGNOSTIC_PROMPT: AI_TAG_DIAGNOSTIC_PROMPT,
 
@@ -3291,7 +2311,7 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         PROMPT_VERSION: PROMPT_VERSION,
 
         // ✅ 热更新功能
-        checkUpdate: checkAndExecutePromptUpdate
+        checkUpdate: async () => false
     };
 
     // 初始化预设系统
