@@ -1,6 +1,6 @@
 ﻿// ========================================================================
-// 记忆表格 v2.3.7
-// SillyTavern 记忆管理系统 - 提供表格化记忆、自动总结、批量填表等功能
+// LEASE Memory Context v3.0.0
+// SillyTavern 记忆管理系统 - 提供表格化记忆、表格总结与独立向量检索
 // ========================================================================
 (function () {
     'use strict';
@@ -16,7 +16,7 @@
     }
     window.GaigaiLoaded = true;
 
-    console.log('🚀 记忆表格 v2.3.7 启动');
+    console.log('🚀 LEASE Memory Context v3.0.0 启动');
 
     // ===== 防止配置被后台同步覆盖的标志 =====
     window.isEditingConfig = false;
@@ -28,14 +28,14 @@
     window.Gaigai.isSwiping = false;
 
     // ==================== 全局常量定义 ====================
-    const V = 'v2.3.7';
+    const V = 'v3.0.0';
     const SK = 'gg_data';              // 数据存储键
     const UK = 'gg_ui';                // UI配置存储键
     const AK = 'gg_api';               // API配置存储键
     const CK = 'gg_config';            // 通用配置存储键
     const CWK = 'gg_col_widths';       // 列宽存储键
     const SMK = 'gg_summarized';       // 已总结行标记存储键
-    const REPO_PATH = 'gaigai315/ST-Memory-Context';  // GitHub仓库路径
+    const REPO_PATH = '';  // 私有魔改版不检查上游仓库更新
 
     // ===== UI主题配置 =====
     let UI = { c: '#dfdcdcff', bc: '#ffffff', tc: '#000000ff', darkMode: false };
@@ -43,7 +43,6 @@
     // ==================== 用户配置对象 ====================
     const C = {
         masterSwitch: true,     // 🔴 全局主开关（长按图标切换）
-        enabled: true,          // ✅ 默认开启实时填表
         filterTags: '',         // 黑名单标签（去除）
         filterTagsWhite: '',    // 白名单标签（仅留）
         filterTagPresets: [],   // 标签过滤预设 [{id,name,black,white,createdAt,updatedAt}]
@@ -51,8 +50,7 @@
         contextLimit: true,     // ✅ 默认开启隐藏楼层
         contextLimitCount: 30,  // ✅ 隐藏30楼
         autoSummaryHideContext: false,
-        autoCalculateParams: true, // ✨ 默认开启智能计算联动
-        tableInj: true,
+        tableInj: false,        // 仅保留记忆总结兜底注入，不直接注入数据表
         tablePos: 'system',
         tablePosType: 'system_end',
         tableDepth: 0,
@@ -64,26 +62,18 @@
         manualSummaryTargetTables: [], // 🆕 手动总结控制台的目标表格索引（空数组表示全部）
         autoSummaryDelay: true,        // ✅ 开启延迟
         autoSummaryDelayCount: 4,      // ✅ 延迟4楼
-        autoBigSummary: false,         // ❌ 默认关闭大总结
-        autoBigSummaryFloor: 100,      // ✅ 100层触发大总结
-        autoBigSummaryFloorManual: false, // ✅ 手动覆盖大总结层数（智能联动不再改写）
-        autoBigSummaryDelay: false,    // ❌ 默认关闭大总结延迟
-        autoBigSummaryDelayCount: 6,   // ✅ 延迟6楼
-        autoBackfill: false,           // ❌ 默认关闭批量填表（避免与实时填表冲突）
-        autoBackfillFloor: 20,         // ✅ 预设20层
-        autoBackfillPrompt: true,      // ✅ 默认静默发起（不弹窗确认）
-        autoBackfillSilent: true,      // ✅ 默认静默保存（不弹窗显示结果）
-        autoBackfillDelay: true,       // ✅ 开启延迟
-        autoBackfillDelayCount: 6,     // ✅ 延迟6楼
+        summaryRowAction: 'hide',      // 总结后处理源行：keep / hide / delete
+        autoBackfill: false,           // 仅兼容手动追溯；不会注册自动追溯入口
+        autoBackfillSilent: true,      // 手动追溯的默认保存方式
+        autoBackfillDelay: true,       // 分批追溯批次间延迟
+        autoBackfillDelayCount: 6,
+        batchBackfillStep: 40,
         log: true,
         minimalLogMode: true,          // ✅ 最小日志模式：仅输出权限命中与拦截结果
         pc: true,
         hideTag: true,
         filterHistory: true,
         cloudSync: true,
-        syncWorldInfo: false,          // ❌ 默认关闭世界书同步
-        syncWorldInfoPanelCollapsed: false, // 📁 世界书分区折叠状态
-        worldInfoVectorized: false,    // ❌ 默认关闭世界书自带向量化（已移除UI选项）
         autoVectorizeSummary: false,   // ❌ 默认关闭总结后自动向量化（每聊隔离）
         summaryRulePanelCollapsed: true, // 📁 记忆发送规则分区折叠状态（默认折叠）
         // ==================== 独立向量检索配置 ====================
@@ -102,8 +92,26 @@
         sinkHiddenRows: false          // 🆕 沉淀已隐藏行（绿色行沉底）
     };
 
+    const REMOVED_LEGACY_CONFIG_KEYS = [
+        'enabled', 'autoBackfillFloor', 'autoBackfillPrompt',
+        'autoBigSummary', 'autoBigSummaryFloor', 'autoBigSummaryFloorManual',
+        'autoBigSummaryDelay', 'autoBigSummaryDelayCount', 'syncWorldInfo',
+        'syncWorldInfoPanelCollapsed', 'worldInfoVectorized', 'autoSummaryHideContext',
+        'contextLimit', 'contextLimitCount'
+    ];
+
+    function sanitizeLeanConfig() {
+        REMOVED_LEGACY_CONFIG_KEYS.forEach(key => delete C[key]);
+        C.autoBackfill = false;
+        C.tableInj = false;
+        C.summaryRowAction = ['keep', 'hide', 'delete'].includes(C.summaryRowAction)
+            ? C.summaryRowAction
+            : 'hide';
+        API_CONFIG.summarySource = 'table';
+    }
+
     // ==================== API配置对象 ====================
-    // 用于独立API调用（批量填表、自动总结等AI功能）
+    // 用于独立API调用（记忆表格总结）
     let API_CONFIG = {
         enableAI: false,
         useIndependentAPI: false,
@@ -113,10 +121,9 @@
         model: 'gemini-2.5-pro',
         temperature: 1,
         maxTokens: 65536,
-        summarySource: 'chat',     // ✅ 默认总结聊天历史
+        summarySource: 'table',    // 仅总结记忆表格
         lastSummaryIndex: 0,
-        lastBackfillIndex: 0,
-        lastBigSummaryIndex: 0,    // 🆕 大总结进度指针
+        lastBackfillIndex: 0,      // 手动剧情追溯进度
         useStream: true,           // ✅ 流式传输开关（默认开启）
         profiles: [],              // ☁️ API 账号预设列表
         activeProfileId: ''        // 当前激活预设ID（用于UI显示）
@@ -1101,22 +1108,7 @@
 
             this.m.save(false, true); // 总结数据立即保存
 
-            // ⚡ 自动化流：如果开启了"总结后自动向量化"，且未开启"同步到世界书"，则直接触发向量化
-            // （如果开启了世界书同步，向量化会在世界书同步完成后触发，避免重复）
-            const currentConfig = window.Gaigai?.config_obj;
-            if (currentConfig && currentConfig.autoVectorizeSummary && !currentConfig.syncWorldInfo) {
-                if (window.Gaigai.VM && typeof window.Gaigai.VM.syncSummaryToBook === 'function') {
-                    console.log('⚡ [自动化流] 总结保存完成，正在触发自动向量化（未启用世界书同步）...');
-                    // 使用 setTimeout 避免阻塞保存流程
-                    setTimeout(async () => {
-                        try {
-                            await window.Gaigai.VM.syncSummaryToBook(true);
-                        } catch (error) {
-                            console.error('❌ [自动化流] 自动向量化失败:', error);
-                        }
-                    }, 100);
-                }
-            }
+            // 向量同步由 SummaryManager 在源行处理完成后统一触发，避免重复同步。
         }
 
         // 读取逻辑也微调一下，让多条总结之间有间隔，方便AI理解
@@ -1334,47 +1326,33 @@
                 d: this.s.map(sh => sh.json()),
                 structure: this.s.map(sh => ({ n: sh.n, c: sh.c })), // ✅ 新增：保存当前表结构（表名和列名）
                 structureBound: this.structureBound, // ✅ 保存结构绑定状态
-                wiConfig: this.wiConfig, // ✅ 保存世界书自定义配置
                 summarized: summarizedRows,
                 colWidths: userColWidths,
                 rowHeights: userRowHeights,
                 // ✅ 新增：保存当前 API 进度指针到这个角色的存档里
                 meta: {
                     lastSum: API_CONFIG.lastSummaryIndex,
-                    lastBf: API_CONFIG.lastBackfillIndex,
-                    lastBigSum: API_CONFIG.lastBigSummaryIndex // ✅ 新增大总结指针独立保存
+                    lastBf: API_CONFIG.lastBackfillIndex
                 },
                 // ✅ Per-Chat Configuration: Save critical feature toggles for this chat
                 config: {
-                    enabled: C.enabled,
-                    autoBackfill: C.autoBackfill,
                     autoSummary: C.autoSummary,
                     // ✅ 核心参数
-                    autoBackfillFloor: C.autoBackfillFloor,
                     autoSummaryFloor: C.autoSummaryFloor,
-                    summarySource: API_CONFIG.summarySource,
-                    // ✅ 自动化细节 (延迟/静默/弹窗) - 之前漏掉的都在这里
-                    autoBackfillDelay: C.autoBackfillDelay,
-                    autoBackfillDelayCount: C.autoBackfillDelayCount,
-                    autoBackfillPrompt: C.autoBackfillPrompt,
-                    autoBackfillSilent: C.autoBackfillSilent,
+                    summarySource: 'table',
                     autoSummaryDelay: C.autoSummaryDelay,
                     autoSummaryDelayCount: C.autoSummaryDelayCount,
                     autoSummaryPrompt: C.autoSummaryPrompt,
                     autoSummarySilent: C.autoSummarySilent,
                     autoSummaryTargetTables: C.autoSummaryTargetTables,
                     manualSummaryTargetTables: C.manualSummaryTargetTables,
+                    summaryRowAction: C.summaryRowAction,
                     // ✅ 其他功能
                     masterSwitch: C.masterSwitch,
-                    contextLimit: C.contextLimit,
-                    contextLimitCount: C.contextLimitCount,
-                    autoSummaryHideContext: C.autoSummaryHideContext,
                     filterTags: C.filterTags,
                     filterTagsWhite: C.filterTagsWhite,
                     filterTagPresets: C.filterTagPresets,
                     filterTagActivePresetId: C.filterTagActivePresetId,
-                    syncWorldInfo: C.syncWorldInfo,
-                    worldInfoVectorized: C.worldInfoVectorized,
                     // ✅ 向量检索配置
                     vectorEnabled: C.vectorEnabled,
                     vectorUrl: C.vectorUrl,
@@ -1573,7 +1551,6 @@
                 userRowHeights = {};
                 API_CONFIG.lastSummaryIndex = 0;
                 API_CONFIG.lastBackfillIndex = 0;
-                API_CONFIG.lastBigSummaryIndex = 0; // ✅ 切换会话时，大总结指针也重置为0
                 localStorage.setItem(AK, JSON.stringify(API_CONFIG));
 
                 console.log(`🔄 [会话切换] ID: ${id}，已重置所有状态`);
@@ -1678,32 +1655,21 @@
                 const globalApiConfig = globalApiStr ? JSON.parse(globalApiStr) : {};
 
                 // --- 1. 开关类 ---
-                C.enabled = globalConfig.enabled !== undefined ? globalConfig.enabled : true;
-                C.autoBackfill = globalConfig.autoBackfill !== undefined ? globalConfig.autoBackfill : false;
                 C.autoSummary = globalConfig.autoSummary !== undefined ? globalConfig.autoSummary : true;
                 // --- 2. 数值类 ---
-                C.autoBackfillFloor = globalConfig.autoBackfillFloor !== undefined ? globalConfig.autoBackfillFloor : 20;
                 C.autoSummaryFloor = globalConfig.autoSummaryFloor !== undefined ? globalConfig.autoSummaryFloor : 50;
-                C.autoBackfillDelay = globalConfig.autoBackfillDelay !== undefined ? globalConfig.autoBackfillDelay : true;
-                C.autoBackfillDelayCount = globalConfig.autoBackfillDelayCount !== undefined ? globalConfig.autoBackfillDelayCount : 6;
                 C.autoSummaryDelay = globalConfig.autoSummaryDelay !== undefined ? globalConfig.autoSummaryDelay : true;
                 C.autoSummaryDelayCount = globalConfig.autoSummaryDelayCount !== undefined ? globalConfig.autoSummaryDelayCount : 4;
                 // --- 3. 其他 ---
-                C.autoBackfillPrompt = globalConfig.autoBackfillPrompt !== undefined ? globalConfig.autoBackfillPrompt : true;
-                C.autoBackfillSilent = globalConfig.autoBackfillSilent !== undefined ? globalConfig.autoBackfillSilent : true;
                 C.autoSummaryPrompt = globalConfig.autoSummaryPrompt !== undefined ? globalConfig.autoSummaryPrompt : true;
                 C.autoSummarySilent = globalConfig.autoSummarySilent !== undefined ? globalConfig.autoSummarySilent : true;
-                C.autoBigSummaryFloorManual = globalConfig.autoBigSummaryFloorManual !== undefined ? globalConfig.autoBigSummaryFloorManual : false;
-                C.contextLimit = globalConfig.contextLimit !== undefined ? globalConfig.contextLimit : true;
-                C.contextLimitCount = globalConfig.contextLimitCount !== undefined ? globalConfig.contextLimitCount : 30;
-                C.autoSummaryHideContext = globalConfig.autoSummaryHideContext !== undefined ? globalConfig.autoSummaryHideContext : false;
+                C.summaryRowAction = ['keep', 'hide', 'delete'].includes(globalConfig.summaryRowAction)
+                    ? globalConfig.summaryRowAction
+                    : 'hide';
                 C.filterTags = globalConfig.filterTags !== undefined ? globalConfig.filterTags : '';
                 C.filterTagsWhite = globalConfig.filterTagsWhite !== undefined ? globalConfig.filterTagsWhite : '';
                 C.filterTagPresets = Array.isArray(globalConfig.filterTagPresets) ? globalConfig.filterTagPresets : [];
                 C.filterTagActivePresetId = globalConfig.filterTagActivePresetId !== undefined ? globalConfig.filterTagActivePresetId : '';
-                C.syncWorldInfo = globalConfig.syncWorldInfo !== undefined ? globalConfig.syncWorldInfo : false;
-                C.syncWorldInfoPanelCollapsed = globalConfig.syncWorldInfoPanelCollapsed !== undefined ? globalConfig.syncWorldInfoPanelCollapsed : false;
-                C.worldInfoVectorized = globalConfig.worldInfoVectorized !== undefined ? globalConfig.worldInfoVectorized : false;
                 C.summaryRulePanelCollapsed = globalConfig.summaryRulePanelCollapsed !== undefined ? globalConfig.summaryRulePanelCollapsed : true;
                 // ✅ 向量检索配置
                 C.vectorEnabled = globalConfig.vectorEnabled !== undefined ? globalConfig.vectorEnabled : false;
@@ -1719,8 +1685,7 @@
                 C.reverseToc = globalConfig.reverseToc !== undefined ? globalConfig.reverseToc : false;
                 C.sinkHiddenRows = globalConfig.sinkHiddenRows !== undefined ? globalConfig.sinkHiddenRows : false;
 
-                if (globalApiConfig.summarySource !== undefined) API_CONFIG.summarySource = globalApiConfig.summarySource;
-                else API_CONFIG.summarySource = 'chat';
+                API_CONFIG.summarySource = 'table';
 
                 console.log('🧹 [配置清洗] 内存状态已重置为全局/默认值，准备加载会话专属配置...');
             } catch (e) {
@@ -1735,12 +1700,6 @@
                 }
                 this.structureBound = finalData.structureBound || false;
 
-                // 恢复世界书自定义配置
-                if (finalData.wiConfig) {
-                    this.wiConfig = finalData.wiConfig;
-                    console.log('✅ [世界书配置] 已恢复');
-                }
-
                 // 恢复数据
                 finalData.d.forEach((sd, i) => { if (this.s[i]) this.s[i].from(sd); });
                 if (finalData.summarized) summarizedRows = finalData.summarized;
@@ -1751,18 +1710,28 @@
                 if (finalData.meta) {
                     if (finalData.meta.lastSum !== undefined) API_CONFIG.lastSummaryIndex = finalData.meta.lastSum;
                     if (finalData.meta.lastBf !== undefined) API_CONFIG.lastBackfillIndex = finalData.meta.lastBf;
-                    if (finalData.meta.lastBigSum !== undefined) API_CONFIG.lastBigSummaryIndex = finalData.meta.lastBigSum; // ✅ 新增恢复大总结指针
                     localStorage.setItem(AK, JSON.stringify(API_CONFIG));
                 }
 
                 // 恢复配置
                 if (finalData.config) {
-                    // ✅ 直接应用会话存档的所有配置（包括 enabled 和 autoBackfill）
-                    Object.assign(C, finalData.config);
-                    console.log('✅ [每聊配置] 已恢复所有设置（包括功能开关）');
-
-                    // 恢复特殊配置
-                    if (finalData.config.summarySource !== undefined) API_CONFIG.summarySource = finalData.config.summarySource;
+                    const allowedConfigKeys = [
+                        'autoSummary', 'autoSummaryFloor', 'autoSummaryDelay',
+                        'autoSummaryDelayCount', 'autoSummaryPrompt', 'autoSummarySilent',
+                        'autoSummaryTargetTables', 'manualSummaryTargetTables', 'summaryRowAction',
+                        'masterSwitch', 'filterTags', 'filterTagsWhite', 'filterTagPresets',
+                        'filterTagActivePresetId', 'vectorEnabled', 'vectorUrl', 'vectorKey',
+                        'vectorModel', 'vectorThreshold', 'vectorMaxCount',
+                        'autoVectorizeSummary', 'reverseView'
+                    ];
+                    allowedConfigKeys.forEach(key => {
+                        if (finalData.config[key] !== undefined) C[key] = finalData.config[key];
+                    });
+                    C.summaryRowAction = ['keep', 'hide', 'delete'].includes(C.summaryRowAction)
+                        ? C.summaryRowAction
+                        : 'hide';
+                    API_CONFIG.summarySource = 'table';
+                    console.log('✅ [每聊配置] 已恢复轻量版支持的设置');
                 }
 
                 lastInternalSaveTime = finalData.ts;
@@ -2775,50 +2744,6 @@
         saveSummarizedRows();
     }
 
-    // ✨✨✨ 新增：公共提示词生成器（只需改这里，全局生效）✨✨✨
-    function generateStrictPrompt(summary, history) {
-        // ✨✨✨ 修复：生成状态栏信息 ✨✨✨
-        const tableTextRaw = m.getTableText();
-        let statusStr = '\n=== 📋 表格状态 ===\n';
-        m.s.slice(0, -1).forEach((s, i) => {
-            const displayName = s.n;
-            const nextIndex = s.r.length;
-            statusStr += `表${i} ${displayName}: ⏭️新增请用索引 ${nextIndex}\n`;
-        });
-        statusStr += '=== 状态结束 ===\n';
-
-        const currentTableData = tableTextRaw ? (tableTextRaw + statusStr) : statusStr;
-
-        return `
-${window.Gaigai.PromptManager.get('tablePrompt')}
-
-【📚 前情提要 (已发生的剧情总结)】
-${summary}
-
-【📊 表格状态】
-${currentTableData}
-
-【🎬 近期剧情 (需要你整理的部分)】
-${history}
-
-==================================================
-【⚠️⚠️⚠️ 最终执行指令 (非常重要) ⚠️⚠️⚠️】
-由于当前表格可能为空，请你务必严格遵守以下格式，不要使用 XML！
-
-1. 🛑 **严禁使用** <Table>, <Row>, <Cell> 等 XML 标签。
-2. ✅ **必须使用** 脚本指令格式。
-3. ✅ **必须补全日期**：insertRow/updateRow 时，第0列(日期)和第1列(时间)绝对不能为空！
-
-【正确输出示范】
-<Memory>
-insertRow(0, {0: "2828年09月15日", 1: "07:50", 3: "赵六在阶梯教室送早餐...", 4: "进行中"})
-updateRow(0, 0, {3: "张三带走了李四..."})
-updateRow(1, 0, {4: "王五销毁了图纸..."})
-</Memory>
-
-请忽略所有思考过程，直接输出 <Memory> 标签内容：`;
-    }
-
     function cleanMemoryTags(text) {
         if (!text) return text;
 
@@ -3258,818 +3183,72 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
         return null;
     }
 
-    function inj(ev) {
-        // 🔴 全局主开关守卫
-        const phoneSignal = extractPhoneSignal(ev.chat);
-        if (!C.masterSwitch) return;
-        const phoneAllowsSummary = !!phoneSignal && phoneSignal.allowSummary === true;
-        const phoneAllowsTable = !!phoneSignal && phoneSignal.allowTable === true;
-        const phoneAllowsPrompt = !!phoneSignal && phoneSignal.allowPrompt === true;
-        const getPrimaryTextFromMessage = (msg) => {
-            if (!msg || typeof msg !== 'object') return '';
-            if (typeof msg.content === 'string') return msg.content;
-            if (typeof msg.mes === 'string') return msg.mes;
+    function injectSummaryFallback(ev) {
+        if (!C.masterSwitch || window.isSummarizing || !ev || !Array.isArray(ev.chat)) return;
 
-            if (Array.isArray(msg.parts)) {
-                const part = msg.parts.find(p => p && typeof p.text === 'string');
-                if (part) return part.text;
-            }
-
-            if (Array.isArray(msg.content)) {
-                const part = msg.content.find(p => p && typeof p.text === 'string');
-                if (part) return part.text;
-            }
+        const getText = msg => {
+            if (typeof msg?.content === 'string') return msg.content;
+            if (typeof msg?.mes === 'string') return msg.mes;
+            if (Array.isArray(msg?.parts)) return msg.parts.find(part => typeof part?.text === 'string')?.text || '';
             return '';
         };
-        const setPrimaryTextToMessage = (msg, text) => {
-            if (!msg || typeof msg !== 'object') return;
-            let written = false;
-
-            if (typeof msg.content === 'string') {
-                msg.content = text;
-                written = true;
-            }
-            if (typeof msg.mes === 'string') {
-                msg.mes = text;
-                written = true;
-            }
-
-            if (Array.isArray(msg.parts)) {
-                const idx = msg.parts.findIndex(p => p && typeof p.text === 'string');
-                if (idx !== -1) {
-                    msg.parts[idx] = Object.assign({}, msg.parts[idx], { text });
-                } else if (msg.parts.length > 0) {
-                    msg.parts[0] = Object.assign({}, msg.parts[0], { text });
-                } else {
-                    msg.parts.push({ text });
-                }
-                written = true;
-            }
-
-            if (Array.isArray(msg.content)) {
-                const idx = msg.content.findIndex(p => p && typeof p.text === 'string');
-                if (idx !== -1) {
-                    msg.content[idx] = Object.assign({}, msg.content[idx], { text });
-                    written = true;
-                }
-            }
-
-            if (!written) {
-                msg.content = text;
+        const setText = (msg, text) => {
+            if (typeof msg?.content === 'string') msg.content = text;
+            else if (typeof msg?.mes === 'string') msg.mes = text;
+            else if (Array.isArray(msg?.parts)) {
+                const part = msg.parts.find(item => typeof item?.text === 'string');
+                if (part) part.text = text;
             }
         };
-        const cloneSplitMessage = (originalMsg, text) => {
-            const cloned = Object.assign({}, originalMsg);
-            setPrimaryTextToMessage(cloned, text);
-            return cloned;
-        };
-        const hasAnyMemoryVar = (text) => /\{\{MEMORY(?:_SUMMARY|_TABLE|_PROMPT)?\}\}|\{\{MEMORY_TABLE_.+?\}\}/i.test(String(text || ''));
-        const stripAllMemoryVars = (text) => String(text || '')
-            .replace(/\{\{MEMORY_TABLE_.+?\}\}/g, '')
-            .replace(/\{\{MEMORY(?:_SUMMARY|_TABLE|_PROMPT)?\}\}/g, '');
-        const normalizeAnchorText = (text) => String(text || '').replace(/\s+/g, ' ').trim();
 
-        // 读取世界书条目状态（enabled/disable），用于判断变量锚点是否来自关闭条目
-        const worldInfoAnchorEntries = (() => {
-            const collected = [];
-            try {
-                const wiRoot = window.world_info;
-                if (!wiRoot || typeof wiRoot !== 'object') return collected;
-
-                const books = Array.isArray(wiRoot) ? wiRoot : Object.values(wiRoot);
-                for (const book of books) {
-                    if (!book || typeof book !== 'object' || !book.entries || typeof book.entries !== 'object') continue;
-                    const entries = Object.values(book.entries);
-
-                    for (const entry of entries) {
-                        if (!entry || typeof entry !== 'object') continue;
-                        const rawContent = String(entry.content || '');
-                        if (!hasAnyMemoryVar(rawContent)) continue;
-
-                        collected.push({
-                            enabled: entry.enabled !== false && entry.disable !== true && entry.active !== false,
-                            normalizedContent: normalizeAnchorText(rawContent)
-                        });
-                    }
-                }
-            } catch (e) {
-                console.warn('⚠️ [锚点检测] 读取 world_info 状态失败:', e);
-            }
-            return collected;
-        })();
-
-        const worldInfoEntryMatchesMessage = (entryText, msgText) => {
-            if (!entryText || !msgText) return false;
-            if (msgText.includes(entryText) || entryText.includes(msgText)) return true;
-
-            // 去掉变量后再做一次弱匹配，兼容带包装文本的场景
-            const entrySkeleton = entryText
-                .replace(/\{\{memory_table_.+?\}\}/gi, '')
-                .replace(/\{\{memory(?:_summary|_table|_prompt)?\}\}/gi, '')
-                .trim();
-            return entrySkeleton.length >= 10 && msgText.includes(entrySkeleton);
-        };
-
-        const isAnchorBlockedByWorldInfoSwitch = (msgContent) => {
-            if (!worldInfoAnchorEntries.length) return false;
-            const normalizedMsg = normalizeAnchorText(msgContent);
-            if (!normalizedMsg) return false;
-
-            let hitEnabled = false;
-            let hitDisabled = false;
-
-            for (const entry of worldInfoAnchorEntries) {
-                if (!worldInfoEntryMatchesMessage(entry.normalizedContent, normalizedMsg)) continue;
-                if (entry.enabled) hitEnabled = true;
-                else hitDisabled = true;
-            }
-
-            return hitDisabled && !hitEnabled;
-        };
-
-        const escapeCssAttrValue = (value) => {
-            const raw = String(value || '');
-            if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
-                return CSS.escape(raw);
-            }
-            return raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        };
-
-        // 检测预设条目开关状态（Prompt Manager 单条开关）
-        const getPromptToggleStateByIdentifier = (identifier) => {
-            if (!identifier || typeof document === 'undefined') return null;
-            const escaped = escapeCssAttrValue(identifier);
-            const selectors = [
-                `[data-identifier="${escaped}"] .prompt-manager-toggle-action`,
-                `[data-id="${escaped}"] .prompt-manager-toggle-action`,
-                `[data-prompt-id="${escaped}"] .prompt-manager-toggle-action`
-            ];
-
-            for (const selector of selectors) {
-                const node = document.querySelector(selector);
-                if (!node) continue;
-                if (node.classList.contains('fa-toggle-off')) return false;
-                if (node.classList.contains('fa-toggle-on')) return true;
-            }
-            return null;
-        };
-
-        const isAnchorBlockedByPromptSwitch = (msg) => {
-            if (!msg || !msg.identifier) return false;
-            const toggleState = getPromptToggleStateByIdentifier(msg.identifier);
-            return toggleState === false;
-        };
-
-        const isAnchorMessageAllowed = (msg, msgContent) => {
-            if (!hasAnyMemoryVar(msgContent)) return true;
-            if (isAnchorBlockedByPromptSwitch(msg)) return false;
-            if (isAnchorBlockedByWorldInfoSwitch(msgContent)) return false;
-            return true;
-        };
-
-        // ✨✨✨ 1. [核心修复] 仅拦截总结/追溯生成的请求 (防止 Prompt 污染) ✨✨✨
-        // 注意：批量填表 (autoBackfill) 期间用户在正常聊天，必须允许注入！
-        if (window.isSummarizing) {
-            // 如果正在执行总结/追溯任务，我们要把 System/Preset 里的变量全部"擦除"
-            // 防止酒馆把 {{MEMORY_PROMPT}} 展开成表格发送给 AI，造成双重数据
-            const varsToRemove = ['{{MEMORY}}', '{{MEMORY_SUMMARY}}', '{{MEMORY_TABLE}}', '{{MEMORY_PROMPT}}'];
-
-            if (ev.chat && Array.isArray(ev.chat)) {
-                ev.chat.forEach(msg => {
-                    let c = getPrimaryTextFromMessage(msg);
-                    if (!c) return;
-
-                    let modified = false;
-                    varsToRemove.forEach(v => {
-                        if (c.includes(v)) {
-                            // 全局替换，防止出现多次
-                            c = c.split(v).join('');
-                            modified = true;
-                        }
-                    });
-
-                    if (modified) {
-                        setPrimaryTextToMessage(msg, c);
-                    }
-                });
-            }
-
-            console.log('🧹 [总结/追溯模式] 已清洗所有记忆变量，防止双重注入。');
-            return; // ⛔️ 仅在此模式下拦截
-        }
-        if (phoneSignal && phoneSignal.allowPrompt === false && ev.chat && Array.isArray(ev.chat)) {
-            ev.chat.forEach(msg => {
-                let c = getPrimaryTextFromMessage(msg);
-                if (!c) return;
-                if (c.includes('{{MEMORY_PROMPT}}')) {
-                    c = c.split('{{MEMORY_PROMPT}}').join('');
-                    setPrimaryTextToMessage(msg, c);
-                }
-            });
-            console.log('[权限管控] 手机禁止了提示词注入，已清洗 {{MEMORY_PROMPT}} 残留');
-        }
-
-        // ============================================================
-        // 1. 准备数据组件 (拆解为原子部分，无论开关与否都准备，以备变量调用)
-        // ============================================================
-        let strSummary = '';
-        let strTable = '';
-        let strPrompt = '';
-
-        // ✅ 准备分区消息数组（用于变量替换时的分区发送）
-        // 这里的命名必须保持 summaryMessages 和 tableMessages，以兼容后文的合并逻辑
-        let summaryMessages = [];
-        let tableMessages = [];
-
-        // A. 准备总结数据
-        // 互斥逻辑：开启世界书同步 或 自动向量化时，插件都不再注入总结（变量也不例外）
-        // 目的：统一为“只发表格内容”，避免总结重复发送。
-        const shouldSuppressSummaryInjection = !!(C.syncWorldInfo || C.autoVectorizeSummary);
-        if (m.sm.has() && !shouldSuppressSummaryInjection) {
-            // 1. 旧逻辑：合并字符串（用于兼容旧的文本变量替换）
-            strSummary = '=== 📚 记忆总结（历史存档） ===\n\n' + m.sm.load() + '\n\n';
-
-            // 2. 新逻辑：按行拆分（用于 System 消息注入）
-            const summaryArray = m.sm.loadArray();
-            summaryArray.forEach((item, i) => {
+        let summaryText = '';
+        const summaryMessages = [];
+        const summaryBookId = `summary_book_${m.gid() || 'default'}`;
+        const summaryBook = window.Gaigai.VM?.library?.[summaryBookId];
+        const vectorSummaryReady = !!(
+            C.vectorEnabled &&
+            C.autoVectorizeSummary &&
+            summaryBook &&
+            Array.isArray(summaryBook.chunks) &&
+            summaryBook.chunks.length > 0 &&
+            Array.isArray(summaryBook.vectorized) &&
+            summaryBook.vectorized.length === summaryBook.chunks.length &&
+            summaryBook.vectorized.every(Boolean)
+        );
+        if (m.sm.has() && !vectorSummaryReady) {
+            const summaries = m.sm.loadArray();
+            summaryText = summaries.map(item => item.content).filter(Boolean).join('\n\n');
+            summaries.forEach((item, index) => {
                 summaryMessages.push({
                     role: 'system',
-                    // 🔴 核心修改：动态设置名字，格式：sys(总结N)
-                    name: `SYSTEM(总结${i + 1})`,
-                    content: `【前情提要 - 剧情总结 ${i + 1}】\n${item.content}`,
+                    name: `SYSTEM(记忆总结${index + 1})`,
+                    content: `【记忆总结】\n${item.content}`,
                     isGaigaiData: true
                 });
             });
         }
 
-        // B. 准备表格数据 (实时构建)
-        // 1. 旧逻辑：合并字符串（用于兼容旧的文本变量替换）
-        const tableContent = m.s.slice(0, -1).map((s, i) => s.txt(i)).filter(t => t).join('\n');
-
-        // ✅ [优化] 只有当表格有内容时才构建 strTable，支持"只总结，不填表"的模式
-        if (tableContent) {
-            strTable += '【⚠️ 记忆只读数据库：已归档的历史剧情 (Past Events)】\n';
-            strTable += '【指令：以下内容为绝对客观的过去事实，仅供你查阅以保持剧情连贯。❌ 严禁复述！❌ 严禁重演！】\n\n';
-            strTable += tableContent;
-            strTable += '\n【记忆档案结束】\n';
-        }
-        // 如果 tableContent 为空，strTable 保持为空字符串，不发送任何内容
-
-        // 2. 新逻辑：按表拆分 (SYSTEM 完整单词 + 强力防重演)
-        // ✅ [修复] 无条件构建 tableMessages，确保变量锚点始终有数据可注入
-        m.s.slice(0, -1).forEach((sheet, i) => {
-            if (sheet.r.length > 0) {
-                const sheetName = sheet.n || `表${i}`;
-                const sheetContent = sheet.txt(i);
-
-                tableMessages.push({
-                    role: 'system',
-                    // 1. 名字：保持你要求的 SYSTEM (表名)
-                    name: `SYSTEM (${sheetName})`,
-
-                    // 2. 内容：标题改为"已归档"，并加上防重演指令
-                    content: `【记忆只读数据库 - ${sheetName}】\n(历史存档 (已完结剧情)，仅作背景参考)\n${sheetContent}`,
-
-                    isGaigaiData: true
-                });
+        let usedAnchor = false;
+        ev.chat.forEach(msg => {
+            const original = getText(msg);
+            if (!original) return;
+            let next = original;
+            if (next.includes('{{MEMORY_SUMMARY}}') || next.includes('{{MEMORY}}')) {
+                next = next
+                    .split('{{MEMORY_SUMMARY}}').join(summaryText)
+                    .split('{{MEMORY}}').join(summaryText);
+                usedAnchor = true;
             }
+            next = next
+                .replace(/\{\{MEMORY_TABLE_.+?\}\}/g, '')
+                .split('{{MEMORY_TABLE}}').join('')
+                .split('{{MEMORY_PROMPT}}').join('');
+            if (next !== original) setText(msg, next);
         });
 
-        // ✅ [优化] 移除兜底逻辑：当所有表格都为空时，不发送任何内容
-        // 这样可以支持"只总结，不填表"的模式，保持聊天更干净
-        // if (tableMessages.length === 0) {
-        //     tableMessages.push({
-        //         role: 'system',
-        //         name: 'SYSTEM (系统提示)',
-        //         content: '【记忆只读数据库】\n（暂无详细记录）',
-        //         isGaigaiData: true
-        //     });
-        // }
-
-        // C. 准备提示词 (仅当开关开启时，才准备提示词，因为关了就不应该填表)
-        // 逻辑：如果开启了批量填表(autoBackfill)，或者检测到是手机专属聊天，强制屏蔽实时填表提示词！
-        if ((C.enabled || phoneAllowsPrompt) && !C.autoBackfill && window.Gaigai.PromptManager.get('tablePrompt')) {
-            strPrompt = window.Gaigai.PromptManager.resolveVariables(window.Gaigai.PromptManager.get('tablePrompt'), m.ctx());
-        }
-        // 核心权限拦截：必须在所有变量扫描之前执行！
-        if (phoneSignal) {
-            if (phoneSignal.allowSummary === false) {
-                summaryMessages = [];
-                strSummary = '';
-            }
-            if (phoneSignal.allowTable === false) {
-                tableMessages = [];
-                strTable = '';
-            }
-            if (phoneSignal.allowPrompt === false) {
-                strPrompt = '';
-            }
-        }
-
-        // ============================================================
-        // 2. 组合智能逻辑 (用于默认插入和 {{MEMORY}})
-        // ============================================================
-        let smartContent = '';
-        let logMsgSmart = '';
-
-        // 独立判断表格注入（读写分离：不受实时记录开关影响）
-        if (C.tableInj) {
-            smartContent = strSummary + strTable;
-            logMsgSmart = "📊 完整数据(智能)";
-        } else {
-            smartContent = strSummary;
-            logMsgSmart = "⚠️ 仅总结(智能)";
-        }
-
-        // ============================================================
-        // 2.5 ✨✨✨ 核心新增：独立表格变量预扫描 (提取特定表) ✨✨✨
-        // 必须在主扫描前进行，确保特定表被从 tableMessages 中优先剔除
-        // ============================================================
-        const normalizeTableAnchorName = (name) => String(name || '')
-            .normalize('NFKC')
-            .replace(/\s+/g, '')
-            .trim()
-            .toLowerCase();
-
-        const getTableNameFromSystemName = (name) => {
-            const m = String(name || '').match(/^SYSTEM\s*\(([\s\S]*?)\)\s*$/i);
-            return m ? m[1] : String(name || '');
-        };
-
-        for (let i = 0; i < ev.chat.length; i++) {
-            let msgContent = getPrimaryTextFromMessage(ev.chat[i]);
-            let modified = false;
-
-            // 开关关闭时，锚点不参与替换，回退默认注入位置
-            if (hasAnyMemoryVar(msgContent) && !isAnchorMessageAllowed(ev.chat[i], msgContent)) {
-                const cleaned = stripAllMemoryVars(msgContent);
-                setPrimaryTextToMessage(ev.chat[i], cleaned);
-                if (cleaned.trim() === '') ev.chat[i]._toDelete = true;
-                console.log('🚫 [锚点拦截] 检测到关闭条目，跳过变量锚点并回退默认注入');
-                continue;
-            }
-
-            // 匹配所有的 {{MEMORY_TABLE_xxx}}
-            const specificTableRegex = /\{\{MEMORY_TABLE_(.+?)\}\}/gi;
-            let match;
-
-            while ((match = specificTableRegex.exec(msgContent)) !== null) {
-                const fullTag = match[0];
-                const targetTableName = match[1].trim();
-                const targetTableKey = normalizeTableAnchorName(targetTableName);
-
-                const tableIndex = tableMessages.findIndex(msg => {
-                    const currentTableName = getTableNameFromSystemName(msg.name);
-                    return normalizeTableAnchorName(currentTableName) === targetTableKey;
-                });
-
-                if (tableIndex !== -1) {
-                    // ✅ 找到表，从总池子中抽出 (splice)
-                    const extractedTableMsg = tableMessages.splice(tableIndex, 1)[0];
-
-                    const varIndex = msgContent.indexOf(fullTag);
-                    const preText = msgContent.substring(0, varIndex).trim();
-                    const postText = msgContent.substring(varIndex + fullTag.length).trim();
-
-                    const newMessages = [];
-                    const originalMsg = ev.chat[i];
-
-                    if (preText) {
-                        newMessages.push(cloneSplitMessage(originalMsg, preText));
-                    }
-                    if (originalMsg.gaigaiPhoneSignal) {
-                        extractedTableMsg.gaigaiPhoneSignal = originalMsg.gaigaiPhoneSignal;
-                    }
-                    newMessages.push(extractedTableMsg);
-                    if (postText) {
-                        newMessages.push(cloneSplitMessage(originalMsg, postText));
-                    }
-
-                    // 原地拆分注入
-                    ev.chat.splice(i, 1, ...newMessages);
-
-                    console.log(`✨ [分裂注入] 表格 [${targetTableName}] 已单独注入并从总池剔除`);
-                    modified = true;
-                    break; // 拆分后结构改变，跳出 while，由 for 循环重新扫描
-                } else {
-                    // ❌ 没找到表（空表或名字错误），直接抹掉标签，防止漏给大变量
-                    msgContent = msgContent.replace(fullTag, '');
-                    setPrimaryTextToMessage(ev.chat[i], msgContent);
-                    console.log(`🧹 [变量清洗] ${fullTag} 已清除（未找到该表或该表为空）`);
-                    specificTableRegex.lastIndex = 0; // 字符串变了，重置正则索引
-                }
-            }
-            if (modified) {
-                i--; // 关键：防止同一条合并消息中的后续 {{MEMORY_TABLE_xxx}} 被跳过
-                continue;
-            }
-        }
-
-        // ============================================================
-        // 3. ✨✨✨ 核心逻辑：变量扫描与锚点置换 (修复多变量并存Bug版) ✨✨✨
-        // ============================================================
-
-        const varSmart = '{{MEMORY}}';          // 智能组合 (跟随开关)
-        const varSum = '{{MEMORY_SUMMARY}}';    // 强制仅总结
-        const varTable = '{{MEMORY_TABLE}}';    // 强制仅表格
-        const varPrompt = '{{MEMORY_PROMPT}}';  // 填表规则
-
-        let replacedSmart = false;
-        let replacedPrompt = false;
-        let replacedSummary = false;  
-        let replacedTable = false;    
-        let foundAnchor = false;
-        let anchorIndex = -1;
-
-        let idxTableVar = -1;      
-        let idxSummaryVar = -1;    
-        let idxSmartVar = -1;      
-
-        let isPromptManagerOn = true;
-        if (typeof SillyTavern !== 'undefined' && SillyTavern.power_user) {
-            if (SillyTavern.power_user.prompt_manager_enabled === false) isPromptManagerOn = false;
-        }
-
-        const allowAnchorMode = true;
-        let deletedCountBeforeAnchor = 0;
-        let hasAllowedSummaryAnchor = false;
-        let hasAllowedTableAnchor = false;
-
-        // 预扫描：只统计“允许参与替换”的锚点，供 {{MEMORY}} 做全局去重决策
-        for (let i = 0; i < ev.chat.length; i++) {
-            const rawContent = getPrimaryTextFromMessage(ev.chat[i]);
-            if (!rawContent || !hasAnyMemoryVar(rawContent)) continue;
-            if (!isAnchorMessageAllowed(ev.chat[i], rawContent)) continue;
-
-            if (rawContent.includes(varSum)) hasAllowedSummaryAnchor = true;
-            if (rawContent.includes(varTable)) hasAllowedTableAnchor = true;
-        }
-
-        // ✅ 3. 扫描并清洗变量 (核心修复：支持同一消息内存在任意顺序的多个变量)
-        for (let i = 0; i < ev.chat.length; i++) {
-            let msgContent = getPrimaryTextFromMessage(ev.chat[i]);
-            let splitted = false; // 标记是否发生了数组分裂
-
-            // 开关关闭时，锚点不参与替换，回退默认注入位置
-            if (hasAnyMemoryVar(msgContent) && !isAnchorMessageAllowed(ev.chat[i], msgContent)) {
-                const cleaned = stripAllMemoryVars(msgContent);
-                setPrimaryTextToMessage(ev.chat[i], cleaned);
-                if (cleaned.trim() === '') ev.chat[i]._toDelete = true;
-                console.log('🚫 [锚点拦截] 检测到关闭条目，已忽略变量锚点');
-                continue;
-            }
-
-            // 1️⃣ 处理长变量：{{MEMORY_PROMPT}} (纯文本替换，不破坏数组结构)
-            if (msgContent.includes(varPrompt)) {
-                if (strPrompt && isPromptManagerOn) {
-                    msgContent = msgContent.replace(varPrompt, strPrompt);
-                    replacedPrompt = true;
-                    ev.chat[i].isGaigaiPrompt = true;
-                    console.log(`🎯 [锚点替换] 提示词已注入至 {{MEMORY_PROMPT}} 位置`);
-                } else {
-                    msgContent = msgContent.replace(varPrompt, '');
-                    console.log(`🧹 [变量清洗] {{MEMORY_PROMPT}} 已清空`);
-                }
-                setPrimaryTextToMessage(ev.chat[i], msgContent);
-            }
-
-            // 2️⃣ 处理：{{MEMORY_SUMMARY}} 
-            if (msgContent.includes(varSum)) {
-                if (idxSummaryVar === -1) idxSummaryVar = i;
-
-                if (replacedSummary) {
-                    msgContent = msgContent.replace(varSum, '');
-                    setPrimaryTextToMessage(ev.chat[i], msgContent);
-                    console.log(`🧹 [去重清洗] ${varSum} 已在前文注入，当前占位符已清除`);
-                } else if (summaryMessages.length > 0) {
-                    const varIndex = msgContent.indexOf(varSum);
-                    const preText = msgContent.substring(0, varIndex).trim();
-                    const postText = msgContent.substring(varIndex + varSum.length).trim();
-                    const newMessages = [];
-                    const originalMsg = ev.chat[i];
-
-                    if (preText) newMessages.push(cloneSplitMessage(originalMsg, preText));
-                    if (originalMsg.gaigaiPhoneSignal) summaryMessages.forEach(m => m.gaigaiPhoneSignal = originalMsg.gaigaiPhoneSignal);
-                    newMessages.push(...summaryMessages);
-                    if (postText) newMessages.push(cloneSplitMessage(originalMsg, postText));
-
-                    ev.chat.splice(i, 1, ...newMessages);
-                    replacedSummary = true;
-                    splitted = true;
-                    console.log(`✨ [原地拆分注入] ${varSum} 处理完成`);
-                } else {
-                    msgContent = msgContent.replace(varSum, '');
-                    setPrimaryTextToMessage(ev.chat[i], msgContent);
-                    replacedSummary = true;
-                    console.log(`🧹 [变量清洗] ${varSum} 已清除`);
-                }
-            }
-
-            // ⚠️ 核心修复：如果发生了分裂，当前索引 i 的消息已经变成了切片。
-            // 我们必须让游标后退一步，让下一轮循环重新扫描这个切片，防止漏掉里面的其他变量(如 {{MEMORY_TABLE}})
-            if (splitted) {
-                i--;
-                continue;
-            }
-
-            // 3️⃣ 处理：{{MEMORY_TABLE}}
-            if (msgContent.includes(varTable)) {
-                if (idxTableVar === -1) idxTableVar = i;
-
-                if (replacedTable) {
-                    msgContent = msgContent.replace(varTable, '');
-                    setPrimaryTextToMessage(ev.chat[i], msgContent);
-                    console.log(`🧹 [去重清洗] ${varTable} 已在前文注入，当前占位符已清除`);
-                } else if (tableMessages.length > 0) {
-                    const varIndex = msgContent.indexOf(varTable);
-                    const preText = msgContent.substring(0, varIndex).trim();
-                    const postText = msgContent.substring(varIndex + varTable.length).trim();
-                    const newMessages = [];
-                    const originalMsg = ev.chat[i];
-
-                    if (preText) newMessages.push(cloneSplitMessage(originalMsg, preText));
-                    if (originalMsg.gaigaiPhoneSignal) tableMessages.forEach(m => m.gaigaiPhoneSignal = originalMsg.gaigaiPhoneSignal);
-                    newMessages.push(...tableMessages);
-                    if (postText) newMessages.push(cloneSplitMessage(originalMsg, postText));
-
-                    ev.chat.splice(i, 1, ...newMessages);
-                    replacedTable = true;
-                    splitted = true;
-                    console.log(`✨ [原地拆分注入] ${varTable} 处理完成`);
-                } else {
-                    msgContent = msgContent.replace(varTable, '');
-                    setPrimaryTextToMessage(ev.chat[i], msgContent);
-                    replacedTable = true;
-                    console.log(`🧹 [变量清洗] ${varTable} 已清除`);
-                }
-            }
-
-            if (splitted) {
-                i--;
-                continue;
-            }
-
-            // 4️⃣ 处理短变量：{{MEMORY}}
-            if (msgContent.includes(varSmart)) {
-                if (idxSmartVar === -1) idxSmartVar = i;
-
-                const shouldInjectSummaryViaSmart = summaryMessages.length > 0 && !replacedSummary && !hasAllowedSummaryAnchor;
-                const shouldInjectTableViaSmart = (C.tableInj || phoneAllowsTable) && tableMessages.length > 0 && !replacedTable && !hasAllowedTableAnchor;
-                const hasData = shouldInjectSummaryViaSmart || shouldInjectTableViaSmart;
-
-                if (hasData) {
-                    const varIndex = msgContent.indexOf(varSmart);
-                    const preText = msgContent.substring(0, varIndex).trim();
-                    const postText = msgContent.substring(varIndex + varSmart.length).trim();
-                    const newMessages = [];
-                    const originalMsg = ev.chat[i];
-
-                    if (preText) newMessages.push(cloneSplitMessage(originalMsg, preText));
-                    
-                    if (shouldInjectSummaryViaSmart) {
-                        if (originalMsg.gaigaiPhoneSignal) summaryMessages.forEach(m => m.gaigaiPhoneSignal = originalMsg.gaigaiPhoneSignal);
-                        newMessages.push(...summaryMessages);
-                    }
-                    if (shouldInjectTableViaSmart) {
-                        if (originalMsg.gaigaiPhoneSignal) tableMessages.forEach(m => m.gaigaiPhoneSignal = originalMsg.gaigaiPhoneSignal);
-                        newMessages.push(...tableMessages);
-                    }
-
-                    if (postText) newMessages.push(cloneSplitMessage(originalMsg, postText));
-
-                    ev.chat.splice(i, 1, ...newMessages);
-                    if (shouldInjectSummaryViaSmart) replacedSummary = true;
-                    if (shouldInjectTableViaSmart) replacedTable = true;
-                    replacedSmart = true;
-                    splitted = true;
-
-                    if (anchorIndex === -1) anchorIndex = i;
-                    foundAnchor = true;
-                    console.log(`✨ [原地拆分注入] ${varSmart} 处理完成 (Summary=${shouldInjectSummaryViaSmart}, Table=${shouldInjectTableViaSmart})`);
-                } else {
-                    msgContent = msgContent.replace(varSmart, '');
-                    setPrimaryTextToMessage(ev.chat[i], msgContent);
-                    console.log(`🧹 [去重清洗] ${varSmart} 无可注入数据或已由专用变量接管，已清除`);
-                }
-            }
-
-            if (splitted) {
-                i--;
-                continue;
-            }
-
-            // 👻 幽灵气泡判定：只有当内容为空 且 不是锚点消息时，才删除
-            // 因为执行到这里说明没有发生分裂，可以安全判定
-            const isAnchor = (i === idxTableVar) || (i === idxSmartVar) || (i === idxSummaryVar) || (i === anchorIndex);
-            if (msgContent.trim() === '' && !isAnchor) {
-                ev.chat[i]._toDelete = true;
-            }
-        }
-
-        // ✅ 4. 删除幽灵气泡并修正索引
-        if (ev.chat.some(msg => msg._toDelete)) {
-            ev.chat = ev.chat.filter((msg, index) => {
-                const keep = !msg._toDelete;
-                if (!keep) {
-                    if (anchorIndex !== -1 && index < anchorIndex) deletedCountBeforeAnchor++;
-                    if (idxSmartVar !== -1 && index < idxSmartVar) idxSmartVar--;
-                    if (idxSummaryVar !== -1 && index < idxSummaryVar) idxSummaryVar--;
-                    if (idxTableVar !== -1 && index < idxTableVar) idxTableVar--;
-                }
-                return keep;
-            });
-            console.log('👻 [清理] 已销毁空的 User 消息对象');
-        }
-
-        if (anchorIndex !== -1) {
-            anchorIndex = anchorIndex - deletedCountBeforeAnchor;
-        }
-
-        // ============================================================
-        // 4. 执行注入 (独立定位：Summary 和 Table 分别处理)
-        // ============================================================
-
-        // 🔧 辅助函数：获取默认插入位置 (Start a new Chat 上方)
-        const getDefaultPosition = () => {
-            let startChatIndex = -1;
-            for (let i = 0; i < ev.chat.length; i++) {
-                if (ev.chat[i].role === 'system' && ev.chat[i].content && ev.chat[i].content.includes('[Start a new Chat]')) {
-                    startChatIndex = i;
-                    break;
-                }
-            }
-            return startChatIndex !== -1 ? startChatIndex : 0; // 兜底：插在最顶端
-        };
-
-        // 📋 收集所有插入操作 (格式: { index: number, messages: array, type: string })
-        const insertionOps = [];
-
-        // ✨ A. 处理总结消息 (summaryMessages)
-        // ✅ 检查是否已通过变量替换：只有未替换时才执行默认插入
-        if (summaryMessages.length > 0 && !replacedSummary) {
-            let summaryPos = -1;
-            let summaryStrategy = '';
-
-            // Priority 1: {{MEMORY_SUMMARY}} 专属变量
-            if (idxSummaryVar !== -1) {
-                summaryPos = idxSummaryVar;
-                summaryStrategy = `⚓ 专属变量 {{MEMORY_SUMMARY}} (位置 #${idxSummaryVar})`;
-            }
-            // Priority 2: {{MEMORY}} 智能变量 (仅当 Prompt Manager 开启且允许锚点模式)
-            else if (allowAnchorMode && idxSmartVar !== -1) {
-                summaryPos = idxSmartVar;
-                summaryStrategy = `⚓ 智能变量 {{MEMORY}} (位置 #${idxSmartVar})`;
-            }
-            // Priority 3: 默认位置（全局注入或手机 App 单独授权时）
-            else if (C.tableInj || phoneAllowsSummary) {
-                summaryPos = getDefaultPosition();
-                summaryStrategy = `📍 默认位置 (Start a new Chat 前，#${summaryPos})`;
-            }
-
-            insertionOps.push({
-                index: summaryPos,
-                messages: summaryMessages,
-                type: 'Summary',
-                strategy: summaryStrategy
-            });
-        }
-
-        // ✨ B. 处理表格消息 (tableMessages)
-        // ✅ 检查是否已通过变量替换：只有未替换时才执行默认插入
-        if (tableMessages.length > 0 && !replacedTable) {
-            let tablePos = -1;
-            let tableStrategy = '';
-            let shouldInject = false; // ✅ [修复] 是否应该注入的标志
-
-            // Priority 1: {{MEMORY_TABLE}} 专属变量
-            if (idxTableVar !== -1) {
-                tablePos = idxTableVar;
-                tableStrategy = `⚓ 专属变量 {{MEMORY_TABLE}} (位置 #${idxTableVar})`;
-                shouldInject = true; // 有变量锚点，强制注入
-            }
-            // Priority 2: {{MEMORY}} 智能变量 (仅当 Prompt Manager 开启且允许锚点模式)
-            else if (allowAnchorMode && idxSmartVar !== -1) {
-                tablePos = idxSmartVar;
-                tableStrategy = `⚓ 智能变量 {{MEMORY}} (位置 #${idxSmartVar})`;
-                shouldInject = true; // 有变量锚点，强制注入
-            }
-            // Priority 3: 默认位置（全局注入或手机 App 单独授权时）
-            else if (C.tableInj || phoneAllowsTable) {
-                tablePos = getDefaultPosition();
-                tableStrategy = `📍 默认位置 (Start a new Chat 前，#${tablePos})`;
-                shouldInject = true;
-            }
-
-            // ✅ [修复] 只有当 shouldInject 为 true 时才添加到插入队列
-            if (shouldInject) {
-                insertionOps.push({
-                    index: tablePos,
-                    messages: tableMessages,
-                    type: 'Table',
-                    strategy: tableStrategy
-                });
-            }
-        }
-
-        // ✨ C. 处理提示词 (strPrompt) - 整合进插入队列
-        // 注意：提示词如果已经通过 {{MEMORY_PROMPT}} 锚点替换，则 replacedPrompt=true，此处不再执行
-        if (strPrompt && !replacedPrompt) {
-            const pmtPos = getInjectionPosition(
-                window.Gaigai.PromptManager.get('tablePromptPos'),
-                window.Gaigai.PromptManager.get('tablePromptPosType'),
-                window.Gaigai.PromptManager.get('tablePromptDepth'),
-                ev.chat
-            );
-            const role = getRoleByPosition(window.Gaigai.PromptManager.get('tablePromptPos'));
-
-            insertionOps.push({
-                index: pmtPos,
-                messages: [{
-                    role: role,
-                    content: strPrompt,
-                    isGaigaiPrompt: true
-                }],
-                type: 'Prompt',
-                strategy: `📝 默认位置 (#${pmtPos})`
-            });
-        }
-
-        // 🚀 D. 排序并执行插入 (关键：从高到低，防止索引错位)
-        // 排序规则：索引从大到小 (Descending)
-        // ⚡ Tie-breaker: 如果索引相同 (同个锚点)，优先执行 Table，后执行 Summary
-        // 这样 Summary 会被插入到 Table 的上方 (后插者在顶端)
-        insertionOps.sort((a, b) => {
-            if (b.index !== a.index) {
-                return b.index - a.index;
-            }
-            // 索引相同，控制执行顺序：Table 先 -> Summary 后
-            // 数组排序：return -1 代表 a 排在 b 前面
-            if (a.type === 'Table' && b.type === 'Summary') return -1;
-            if (a.type === 'Summary' && b.type === 'Table') return 1;
-            return 0;
-        });
-
-        insertionOps.forEach(op => {
-            ev.chat.splice(op.index, 0, ...op.messages);
-            console.log(`📥 [数据注入] ${op.type} | ${op.strategy} | 消息数: ${op.messages.length}`);
-        });
-
-        // ✅ E. 兜底日志：如果没有任何注入
-        if (insertionOps.length === 0) {
-            console.log(`⚠️ [数据注入] 无数据需要注入 (Summary/Table/Prompt 均为空或已处理)`);
-        }
-
-        // ============================================================
-        // 5. 过滤历史 (适配手机插件)
-        // ============================================================
-        if (C.filterHistory) {
-            // 获取 AI 正在生成的消息的索引。通常是 chat 数组的最后一项（如果 AI 正在说话）
-            const lastMessageIndex = ev.chat.length - 1;
-
-            ev.chat.forEach((msg, idx) => { // <-- ✨ 增加 idx 参数
-                // 跳过插件自己注入的提示词、数据
-                if (msg.isGaigaiPrompt || msg.isGaigaiData || msg.isPhoneMessage) return;
-
-                // ✨✨✨ 核心修复：遇到 System (系统) 消息直接跳过，绝对不清洗！✨✨✨
-                if (msg.role === 'system') return;
-
-                // 跳过特定的手机消息格式
-                if (msg.content && (msg.content.includes('📱 手机') || msg.content.includes('手机微信消息记录'))) return;
-
-                // ✅✅✅ 关键修复点：
-                // 仅清洗 AI 的“历史”回复 (即：不是当前 AI 正在生成的那条消息)
-                // 这样可以确保 AI 当前正在输出的带有 <Memory> 标签的内容不会被提前清除
-                if ((msg.role === 'assistant' || !msg.is_user) && idx !== lastMessageIndex) { // <-- ✨ 修改这一行
-                    const fields = ['content', 'mes', 'message', 'text'];
-                    fields.forEach(f => {
-                        if (msg[f] && typeof msg[f] === 'string') msg[f] = msg[f].replace(MEMORY_TAG_REGEX, '').trim();
-                    });
-                }
-            });
-        }
-
-        // ============================================================
-        // 6. 最后一道防线：清洗残留的变量名（防止泄漏给 AI）
-        // ============================================================
-        const varsToClean = ['{{MEMORY}}', '{{MEMORY_SUMMARY}}', '{{MEMORY_TABLE}}', '{{MEMORY_PROMPT}}'];
-        if (ev.chat && Array.isArray(ev.chat)) {
-            ev.chat.forEach(msg => {
-                let c = getPrimaryTextFromMessage(msg);
-                if (!c) return;
-
-                let modified = false;
-                varsToClean.forEach(v => {
-                    if (c.includes(v)) {
-                        c = c.split(v).join('');
-                        modified = true;
-                    }
-                });
-
-                if (modified) {
-                    setPrimaryTextToMessage(msg, c);
-                    console.log(`⚠️ [最后防线] 清洗了残留的变量名，防止泄漏给 AI`);
-                }
-            });
+        if (!usedAnchor && summaryMessages.length > 0) {
+            const position = getInjectionPosition(C.tablePos, C.tablePosType, C.tableDepth, ev.chat);
+            ev.chat.splice(position, 0, ...summaryMessages);
         }
     }
 
@@ -5463,7 +4642,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
             <button id="gai-btn-cleanup" title="清理数据选项"><i class="fa-solid fa-broom"></i> 清表</button>
             <button id="gai-btn-view" title="视图设置"><i class="fa-solid fa-ruler-combined"></i> 视图</button>
             <button id="gai-btn-theme" title="设置外观"><i class="fa-solid fa-palette"></i> 主题</button>
-            <button id="gai-btn-back" title="追溯历史剧情填表"><i class="fa-solid fa-bolt"></i> 追溯</button>
+            <button id="gai-btn-back" title="追溯历史剧情并补填记忆表格"><i class="fa-solid fa-bolt"></i> 追溯</button>
             <button id="gai-btn-sum" title="AI智能总结"><i class="fa-solid fa-pen-to-square"></i> 总结</button>
             <button id="gai-btn-toggle" title="切换选中行的已总结状态"><i class="fa-solid fa-ghost"></i> 显/隐</button>
             <button id="gai-btn-config" title="插件设置"><i class="fa-solid fa-gear"></i> 配置</button>
@@ -7272,7 +6451,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 // 重置填表进度指针（不重置总结指针）
                 API_CONFIG.lastSummaryIndex = 0;
                 API_CONFIG.lastBackfillIndex = 0;
-                API_CONFIG.lastBigSummaryIndex = 0; // ✅ 切换会话时，大总结指针也重置为0
                 localStorage.setItem(AK, JSON.stringify(API_CONFIG));
 
                 // 同步到云端
@@ -7330,8 +6508,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
 
                 // 2. 重置总结进度
                 API_CONFIG.lastSummaryIndex = 0;
-                API_CONFIG.lastBackfillIndex = 0;
-                API_CONFIG.lastBigSummaryIndex = 0;
                 localStorage.setItem(AK, JSON.stringify(API_CONFIG));
 
                 // 异步触发云端同步
@@ -7383,7 +6559,13 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
         });
 
         $('#gai-btn-theme').off('click').on('click', () => navTo('主题设置', shtm));
-        $('#gai-btn-back').off('click').on('click', () => navTo('⚡ 剧情追溯填表', () => window.Gaigai.BackfillManager.showUI()));
+        $('#gai-btn-back').off('click').on('click', async () => {
+            if (!window.Gaigai.BackfillManager || typeof window.Gaigai.BackfillManager.showUI !== 'function') {
+                await customAlert('追溯模块尚未加载，请稍后重试。', '功能未就绪');
+                return;
+            }
+            navTo('⚡ 剧情追溯填表', () => window.Gaigai.BackfillManager.showUI());
+        });
         $('#gai-btn-config').off('click').on('click', () => navTo('配置', shcf));
 
         // ✨✨✨ 修改：移除显隐操作的成功弹窗，只刷新表格 ✨✨✨
@@ -10727,15 +9909,16 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
         if (useServerData) {
             // 应用配置
             if (serverData.config) Object.assign(C, serverData.config);
+            sanitizeLeanConfig();
 
             // 保护 API 进度指针
             if (serverData.api) {
                 const currentSumIdx = API_CONFIG.lastSummaryIndex;
                 const currentBfIdx = API_CONFIG.lastBackfillIndex;
-                const currentBigSumIdx = API_CONFIG.lastBigSummaryIndex; // ✅ 备份大总结指针
-                const currentSumSrc = API_CONFIG.summarySource; // ✅ 新增备份：保护总结来源（会话独立配置）
 
                 Object.assign(API_CONFIG, serverData.api);
+                delete API_CONFIG.lastBigSummaryIndex;
+                API_CONFIG.summarySource = 'table';
 
                 // 恢复运行时指针（防止云端旧指针覆盖本地新进度）
                 if (currentSumIdx !== undefined && currentSumIdx > (serverData.api.lastSummaryIndex || 0)) {
@@ -10743,15 +9926,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 }
                 if (currentBfIdx !== undefined && currentBfIdx > (serverData.api.lastBackfillIndex || 0)) {
                     API_CONFIG.lastBackfillIndex = currentBfIdx;
-                }
-                if (currentBigSumIdx !== undefined && currentBigSumIdx > (serverData.api.lastBigSummaryIndex || 0)) {
-                    API_CONFIG.lastBigSummaryIndex = currentBigSumIdx; // ✅ 恢复大总结指针
-                }
-
-                // ✅ 新增恢复：恢复总结来源（防止全局配置覆盖当前会话的独立设置）
-                if (currentSumSrc !== undefined) {
-                    API_CONFIG.summarySource = currentSumSrc;
-                    console.log(`🔒 [会话隔离] 已保护当前会话的总结来源设置: ${currentSumSrc}`);
                 }
             }
 
@@ -11114,97 +10288,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
 
         ${hibernateBanner}
         <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.2);">
-            
-            <!-- ✅ 智能计算联动 (采用标准整行排版) -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div>
-                    <label style="font-weight: 600; display:block; color: #0d0d0d;">✨ 智能计算联动</label>
-                    <span style="font-size:10px; opacity:0.7;">勾选后，当手动填写隐藏楼层/小总结楼层处时，自动帮助填写其他楼层数值合理化</span>
-                </div>
-                <input type="checkbox" id="gg_c_auto_calc" ${C.autoCalculateParams ? 'checked' : ''} style="transform: scale(1.2);">
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed rgba(0,0,0,0.1); margin: 5px 0 8px 0;">
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div>
-                    <label style="font-weight: 600; display:block;">💡 实时填表</label>
-                    <span style="font-size:10px; opacity:0.7;">每回合正文内回复 (与酒馆同一API)</span>
-                </div>
-                <input type="checkbox" id="gg_c_enabled" ${C.enabled ? 'checked' : ''} style="transform: scale(1.2);">
-            </div>
-            
-            <hr style="border: 0; border-top: 1px dashed rgba(0,0,0,0.1); margin: 5px 0 8px 0;">
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <div>
-                    <label style="font-weight: 600; display:block;">⚡ 批量填表</label>
-                    <span style="font-size:10px; opacity:0.7;">每隔N层填表 (建议配置独立API)</span>
-                </div>
-                <input type="checkbox" id="gg_c_auto_bf" ${C.autoBackfill ? 'checked' : ''} style="transform: scale(1.2);">
-            </div>
-            
-            <div id="gg_auto_bf_settings" style="font-size: 11px; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 4px; margin-bottom: 5px; ${C.autoBackfill ? '' : 'display:none;'}">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                    <span>每</span>
-                    <input type="number" id="gg_c_auto_bf_floor" value="${C.autoBackfillFloor || 10}" min="2" style="width:70px; text-align:center; padding:2px; border-radius:4px; border:1px solid rgba(0,0,0,0.2);" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                    <span>层触发一次</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; padding-left:8px; border-left:2px solid rgba(255,152,0,0.3);">
-                    <input type="checkbox" id="gg_c_auto_bf_delay" ${C.autoBackfillDelay ? 'checked' : ''} style="margin:0;">
-                    <label for="gg_c_auto_bf_delay" style="cursor:pointer; display:flex; align-items:center; gap:4px; margin:0;">
-                        <span>⏱️ 延迟启动</span>
-                    </label>
-                    <span style="opacity:0.7;">|</span>
-                    <span style="opacity:0.8;">滞后</span>
-                    <input type="number" id="gg_c_auto_bf_delay_count" value="${C.autoBackfillDelayCount || 5}" min="1" style="width:70px; text-align:center; padding:2px; border-radius:4px; border:1px solid rgba(0,0,0,0.2);" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                    <span style="opacity:0.8;">层再执行</span>
-                </div>
-                <div style="background: rgba(33, 150, 243, 0.08); border: 1px solid rgba(33, 150, 243, 0.2); border-radius: 4px; padding: 8px; margin-bottom: 6px;">
-                    <div style="font-weight: 600; margin-bottom: 4px; color: #1976d2; font-size: 10px;">🔔 发起模式</div>
-                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-bottom: 2px;">
-                        <input type="checkbox" id="gg_c_auto_bf_prompt" ${C.autoBackfillPrompt ? 'checked' : ''}>
-                        <span>🤫 触发前静默发起 (直接执行)</span>
-                    </label>
-                    <div style="font-size: 9px; color: #666; margin-left: 20px;">未勾选时弹窗确认</div>
-                </div>
-                <div style="background: rgba(76, 175, 80, 0.08); border: 1px solid rgba(76, 175, 80, 0.2); border-radius: 4px; padding: 8px;">
-                    <div style="font-weight: 600; margin-bottom: 4px; color: #388e3c; font-size: 10px;">✅ 完成模式</div>
-                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-bottom: 2px;">
-                        <input type="checkbox" id="gg_c_auto_bf_silent" ${C.autoBackfillSilent ? 'checked' : ''}>
-                        <span>🤫 完成后静默保存 (不弹结果窗)</span>
-                    </label>
-                    <div style="font-size: 9px; color: ${UI.tc}; opacity:0.7; margin-left: 20px;">未勾选时弹窗显示填表结果</div>
-                </div>
-            </div>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.2);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <label style="font-weight: 600;">✂️ 隐藏楼层</label>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 11px;">留</span>
-                    <input type="number" id="gg_c_limit_count" value="${C.contextLimitCount}" min="5" style="width: 70px; text-align: center; border-radius: 4px; border:1px solid rgba(0,0,0,0.2);" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                    <input type="checkbox" id="gg_c_limit_on" ${C.contextLimit ? 'checked' : ''}>
-                </div>
-            </div>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.92); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.4);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label style="font-weight: 600;">
-                    💉 注入记忆表格
-                    <i class="fa-solid fa-circle-info" id="gg_memory_injection_info" style="margin-left: 6px; color: #17a2b8; cursor: pointer; font-size: 14px;"></i>
-                </label>
-                <input type="checkbox" id="gg_c_table_inj" ${C.tableInj ? 'checked' : ''} style="transform: scale(1.2);">
-            </div>
-
-            <div style="font-size: 11px; opacity: 0.8; line-height: 1.5;">
-                注入策略点击上方 i 图标查看。
-            </div>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.2);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <label style="font-weight: 600;">🤖 自动总结</label>
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -11216,19 +10299,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
             </div>
 
             <div id="gg_auto_sum_settings" style="padding: 8px; background: rgba(0,0,0,0.03); border-radius: 4px; ${C.autoSummary ? '' : 'display:none;'}">
-                <div style="display:flex; gap:15px; margin-bottom:8px;">
-                    <label style="font-size:11px; display:flex; align-items:center; cursor:pointer; opacity:0.9;">
-                        <input type="radio" name="cfg-sum-src" value="table" ${API_CONFIG.summarySource === 'table' ? 'checked' : ''} style="margin-right:4px;">
-                        📊 仅表格
-                    </label>
-                    <label style="font-size:11px; display:flex; align-items:center; cursor:pointer; opacity:0.9;">
-                        <input type="radio" name="cfg-sum-src" value="chat" ${API_CONFIG.summarySource === 'chat' ? 'checked' : ''} style="margin-right:4px;">
-                        💬 聊天历史
-                    </label>
-                </div>
-
-                <!-- 🆕 表格选择区域（仅在"仅表格"模式下显示） -->
-                <div id="gg_auto_sum_table_selector" style="background: rgba(76, 175, 80, 0.08); border: 1px solid rgba(76, 175, 80, 0.2); border-radius: 6px; padding: 10px; margin-bottom: 8px; ${API_CONFIG.summarySource === 'table' ? '' : 'display:none;'}">
+                <div id="gg_auto_sum_table_selector" style="background: rgba(76, 175, 80, 0.08); border: 1px solid rgba(76, 175, 80, 0.2); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
                     <div style="font-weight: 600; margin-bottom: 6px; color: #388e3c; font-size: 11px;">
                         <span>🎯 选择要总结的表格：</span>
                     </div>
@@ -11285,39 +10356,13 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 </div>
 
                 <div style="background: rgba(255, 152, 0, 0.08); border: 1px solid rgba(255, 152, 0, 0.2); border-radius: 4px; padding: 8px;">
-                    <div style="font-weight: 600; margin-bottom: 4px; color: #f57c00; font-size: 10px;">🙈 上下文管理</div>
-                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-bottom: 2px;">
-                        <input type="checkbox" id="gg_c_auto_sum_hide" ${C.autoSummaryHideContext ? 'checked' : ''}>
-                        <span>🙈 总结后隐藏原楼层</span>
-                    </label>
-                    <div style="font-size: 9px; color: #666; margin-left: 20px;">触发总结后，发送请求时将自动剔除已总结的历史消息 (0 ~ 指针位置)</div>
-                    <div style="font-size: 9px; color: #d32f2f; margin-left: 20px; margin-top: 4px;">⚠️ 与"隐藏楼层"功能互斥，开启其中一个会自动关闭另一个</div>
+                    <div style="font-weight: 600; margin-bottom: 4px; color: #f57c00; font-size: 10px;">📦 总结后处理源行</div>
+                    <select id="gg_c_summary_row_action" style="width:100%;padding:6px;border-radius:4px;">
+                        <option value="keep" ${C.summaryRowAction === 'keep' ? 'selected' : ''}>保留（继续显示）</option>
+                        <option value="hide" ${C.summaryRowAction === 'hide' ? 'selected' : ''}>隐藏（绿色已归档）</option>
+                        <option value="delete" ${C.summaryRowAction === 'delete' ? 'selected' : ''}>删除（从源表移除）</option>
+                    </select>
                 </div>
-            </div>
-        </div>
-
-        <div style="background: rgba(255,255,255,0.15); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,255,255,0.2);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <label style="font-weight: 600;">📚 自动大总结（聊天历史）</label>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 11px;">每</span>
-                    <input type="number" id="gg_c_big_sum_floor" value="${C.autoBigSummaryFloor}" min="50" style="width: 70px; text-align: center; border-radius: 4px; border:1px solid rgba(0,0,0,0.2);" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                    <span style="font-size: 11px;">层</span>
-                    <input type="checkbox" id="gg_c_big_sum" ${C.autoBigSummary ? 'checked' : ''} style="transform: scale(1.2);">
-                </div>
-            </div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; padding-left:8px; border-left:2px solid rgba(255,152,0,0.3); font-size:11px;">
-                <input type="checkbox" id="gg_c_auto_big_delay" ${C.autoBigSummaryDelay ? 'checked' : ''} style="margin:0;">
-                <label for="gg_c_auto_big_delay" style="cursor:pointer; display:flex; align-items:center; gap:4px; margin:0;">
-                    <span>⏱️ 延迟启动</span>
-                </label>
-                <span style="opacity:0.7;">|</span>
-                <span style="opacity:0.8;">滞后</span>
-                <input type="number" id="gg_c_auto_big_delay_count" value="${C.autoBigSummaryDelayCount || 6}" min="1" style="width:70px; text-align:center; padding:2px; border-radius:4px; border:1px solid rgba(0,0,0,0.2);" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-                <span style="opacity:0.8;">层再执行</span>
-            </div>
-            <div style="font-size: 10px; color: ${UI.tc}; opacity: 0.7; padding: 8px; background: rgba(0,0,0,0.03); border-radius: 4px;">
-                💡 大总结会对指定跨度的楼层进行一次性总结，并自动清理该区间内的零散小总结
             </div>
         </div>
 
@@ -11404,43 +10449,12 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                         <span class="gg-summary-default-state">已开启（默认）</span>
                     </div>
                     <div class="gg-summary-rule-tip">
-                        若需世界书/向量化发送记忆总结，请在对应区域配置；配置后，默认选项将被覆盖。
+                        启用总结后自动向量化时，默认注入将由向量检索替代。
                     </div>
                 </div>
             </div>
 
-            <div class="gg-sync-vector-grid">
-                <div class="gg-config-card gg-worldbook-card ${C.syncWorldInfoPanelCollapsed ? 'gg-card-collapsed' : ''}">
-                    <div class="gg-config-card-header">
-                        <div class="gg-config-card-title">🌏 世界书总结</div>
-                        <button
-                            type="button"
-                            id="gg_toggle_worldbook_panel"
-                            class="gg-config-card-toggle"
-                            aria-expanded="${C.syncWorldInfoPanelCollapsed ? 'false' : 'true'}"
-                            aria-controls="gg_worldbook_panel_body"
-                        >${C.syncWorldInfoPanelCollapsed ? '>' : '<'}</button>
-                    </div>
-
-                    <div id="gg_worldbook_panel_body" class="gg-config-card-body">
-                        <label class="gg-cfg-option gg-cfg-option-strong">
-                            <input type="checkbox" id="gg_c_sync_wi" ${C.syncWorldInfo ? 'checked' : ''}>
-                            <span>同步到世界书</span>
-                        </label>
-                        <div class="gg-cfg-hint">
-                            默认世界书名称以 <strong>[Memory_Context_]</strong> 开头；勾选后将不发送记忆总结，改由世界书发送。
-                        </div>
-
-                        ${window.Gaigai.WI.getSettingsUI(m.wiConfig)}
-
-                        <div class="gg-world-sync-actions">
-                            <button id="gg_btn_force_sync_wi" style="background: #ff9800; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                                <i class="fa-solid fa-arrows-rotate"></i> 强制用总结表覆盖世界书
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
+            <div class="gg-sync-vector-grid" style="grid-template-columns: 1fr;">
                 <div class="gg-config-card gg-vector-card ${C.vectorPanelCollapsed ? 'gg-card-collapsed' : ''}">
                     <div class="gg-config-card-header">
                         <div class="gg-config-card-title">💠 向量化总结</div>
@@ -11530,28 +10544,8 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
         window.isEditingConfig = true; // 标记开始编辑配置，防止后台同步覆盖用户输入
 
         setTimeout(() => {
-            // ✅✅✅ [修复] 强制同步 UI 状态与内存配置
-            // 优先读取 API_CONFIG.summarySource，如果未定义则默认为 'chat' (与定义保持一致)
-            const currentSummarySource = API_CONFIG.summarySource || 'chat';
-
-            // 1. 先重置所有选中状态
-            $('input[name="cfg-sum-src"]').prop('checked', false);
-
-            // 2. 根据当前值选中对应的按钮
-            const $targetRadio = $(`input[name="cfg-sum-src"][value="${currentSummarySource}"]`);
-            if ($targetRadio.length > 0) {
-                $targetRadio.prop('checked', true);
-            } else {
-                // 兜底：如果值不对，默认选中 chat
-                $('input[name="cfg-sum-src"][value="chat"]').prop('checked', true);
-            }
-
-            // 3. 触发 change 事件以更新关联 UI (如显示/隐藏子选项)
-            $('input[name="cfg-sum-src"]:checked').trigger('change');
-
-            console.log(`✅ [配置面板] 总结模式 UI 已同步为: ${currentSummarySource}`);
-            // ✅ 用户手动修改过大总结层数时，智能联动不再改写该值
-            let bigSummaryFloorManualOverride = !!C.autoBigSummaryFloorManual;
+            // 轻量版仅支持记忆表格总结。
+            API_CONFIG.summarySource = 'table';
 
             // ==================== 世界书/向量化分区折叠状态 ====================
             const persistPanelFoldState = () => {
@@ -11576,22 +10570,13 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 C[configKey] = collapsed;
             };
 
-            const $worldbookCard = $('.gg-worldbook-card');
             const $vectorCard = $('.gg-vector-card');
             const $summaryRuleCard = $('.gg-summary-rule-card');
-            const $toggleWorldbook = $('#gg_toggle_worldbook_panel');
             const $toggleVector = $('#gg_toggle_vector_panel');
             const $toggleSummaryRule = $('#gg_toggle_summary_rule_panel');
 
-            setPanelCollapsed($worldbookCard, $toggleWorldbook, !!C.syncWorldInfoPanelCollapsed, 'syncWorldInfoPanelCollapsed');
             setPanelCollapsed($vectorCard, $toggleVector, !!C.vectorPanelCollapsed, 'vectorPanelCollapsed');
             setPanelCollapsed($summaryRuleCard, $toggleSummaryRule, !!C.summaryRulePanelCollapsed, 'summaryRulePanelCollapsed');
-
-            $toggleWorldbook.off('click').on('click', function () {
-                const nextCollapsed = !$worldbookCard.hasClass('gg-card-collapsed');
-                setPanelCollapsed($worldbookCard, $toggleWorldbook, nextCollapsed, 'syncWorldInfoPanelCollapsed');
-                persistPanelFoldState();
-            });
 
             $toggleVector.off('click').on('click', function () {
                 const nextCollapsed = !$vectorCard.hasClass('gg-card-collapsed');
@@ -11624,136 +10609,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 console.log('💾 [每聊配置] 已保存自动总结设置到当前聊天:', isChecked);
             });
 
-            // 🆕 总结来源单选按钮的 UI 联动（控制表格选择区域的显示/隐藏）
-            $('input[name="cfg-sum-src"]').on('change', function () {
-                const selectedSource = $(this).val();
-                if (selectedSource === 'table') {
-                    $('#gg_auto_sum_table_selector').slideDown(200);
-                } else {
-                    $('#gg_auto_sum_table_selector').slideUp(200);
-                }
-            });
-
-            // ✨✨✨ [关键修复] 总结来源单选按钮的 change 事件监听器 ✨✨✨
-            $('input[name="cfg-sum-src"]').on('change', function () {
-                // 🛡️ 防止配置恢复期间触发保存
-                if (isRestoringSettings) {
-                    console.log('⏸️ [cfg-sum-src] 配置恢复中，跳过保存');
-                    return;
-                }
-
-                const selectedSource = $(this).val();
-                console.log(`🔄 [总结来源] 用户选择了: ${selectedSource}`);
-
-                // ✅ 更新 API_CONFIG
-                API_CONFIG.summarySource = selectedSource;
-
-                // ✅ 保存到 localStorage
-                try {
-                    localStorage.setItem(AK, JSON.stringify(API_CONFIG));
-                } catch (e) {
-                    console.error('❌ [cfg-sum-src] localStorage 写入失败:', e);
-                }
-
-                // ✅ Per-Chat Configuration: Save to current chat immediately
-                m.save(false, true); // 配置更改立即保存
-                console.log('💾 [每聊配置] 已保存总结来源设置到当前聊天:', selectedSource);
-
-                // ✅ 同步到云端
-                if (typeof saveAllSettingsToCloud === 'function') {
-                    saveAllSettingsToCloud().catch(err => {
-                        console.warn('⚠️ [总结来源] 云端同步失败:', err);
-                    });
-                }
-            });
-
-            // 💉 注入记忆表格说明图标点击事件
-            $('#gg_memory_injection_info').on('click', function () {
-                // 🌙 Dark Mode Fix: Use dynamic colors based on darkMode setting
-                const dialogBg = UI.darkMode ? '#1e1e1e' : '#ffffff';
-                const titleColor = UI.darkMode ? '#e0e0e0' : '#333';
-                const textColor = UI.darkMode ? '#c0c0c0' : '#555';
-                const accentColor = UI.darkMode ? '#4db8ff' : '#155724';
-                const codeBg = UI.darkMode ? '#2a2a2a' : '#f0f0f0';
-                const borderColor = UI.darkMode ? 'rgba(255, 255, 255, 0.15)' : '#f0f0f0';
-
-                // 创建一个小型弹窗而不是使用pop
-                const $overlay = $('<div>', {
-                    // class: 'g-ov', <--- 删掉了这一行
-                    css: {
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        zIndex: 20000010,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '20px'
-                    }
-                });
-
-                const $dialog = $('<div>', {
-                    css: {
-                        background: dialogBg,
-                        borderRadius: '12px',
-                        padding: '20px',
-                        maxWidth: '500px',
-                        width: '90%',
-                        maxHeight: '80vh',
-                        overflow: 'auto',
-                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.3)',
-                        margin: 'auto'
-                    }
-                });
-
-                const $title = $('<div>', {
-                    html: `<strong style="font-size: 15px; color: ${titleColor};">💉 变量模式说明</strong>`,
-                    css: { marginBottom: '15px', paddingBottom: '10px', borderBottom: `2px solid ${borderColor}` }
-                });
-
-                const $content = $('<div>', {
-                    css: { fontSize: '13px', lineHeight: '1.8', color: 'var(--g-tc)' },
-                    html: `
-                        <div style="margin-bottom: 12px; font-weight: 600; color: ${accentColor};">🌟 变量模式：</div>
-                        <div style="margin-bottom: 12px;">如需调整表格里面的内容在上下文的位置，用户需手动将对应的变量，新增条目插入到预设中：</div>
-                        <div style="margin-bottom: 8px;">• 全部内容(表格+总结)：<code style="background:${codeBg}; color:${accentColor}; padding:2px 6px; border-radius:3px; font-weight:bold;">{{MEMORY}}</code> (跟随实时填表开关)</div>
-                        <div style="margin-bottom: 8px;">• 表格插入变量(不含总结表)：<code style="background:${codeBg}; color:${accentColor}; padding:2px 6px; border-radius:3px; font-weight:bold;">{{MEMORY_TABLE}}</code> (强制发送表格内容)</div>
-                        <div style="margin-bottom: 8px;">• 单表插入变量：<code style="background:${codeBg}; color:${accentColor}; padding:2px 6px; border-radius:3px; font-weight:bold;">{{MEMORY_TABLE_xxx}}</code> (xxx=表格名，例如 <code style="background:${codeBg}; color:${accentColor}; padding:2px 6px; border-radius:3px; font-weight:bold;">{{MEMORY_TABLE_主线剧情}}</code>)</div>
-                        <div style="margin-bottom: 8px;">• 总结插入变量(不含其他表格)：<code style="background:${codeBg}; color:${accentColor}; padding:2px 6px; border-radius:3px; font-weight:bold;">{{MEMORY_SUMMARY}}</code> (默认发送总结；若开启同步世界书或自动向量化则不发送)</div>
-                        <div>• 实时填表提示词插入变量：<code style="background:${codeBg}; color:${accentColor}; padding:2px 6px; border-radius:3px; font-weight:bold;">{{MEMORY_PROMPT}}</code></div>
-                    `
-                });
-
-                const $closeBtn = $('<button>', {
-                    text: '知道了',
-                    css: {
-                        marginTop: '15px',
-                        padding: '8px 20px',
-                        background: UI.c || '#888',
-                        color: UI.tc || '#ffffff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        width: '100%'
-                    }
-                }).on('click', () => $overlay.remove());
-
-                $dialog.append($title, $content, $closeBtn);
-                $overlay.append($dialog);
-                $('body').append($overlay);
-
-                // 点击遮罩层也可以关闭
-                $overlay.on('click', function (e) {
-                    if (e.target === $overlay[0]) {
-                        $overlay.remove();
-                    }
-                });
-            });
 
             $('#gg_open_probe').on('click', function () {
                 if (window.Gaigai && window.Gaigai.DebugManager) {
@@ -11813,6 +10668,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
 
                     if (serverConfig) {
                         if (serverConfig.config) Object.assign(C, serverConfig.config);
+                        sanitizeLeanConfig();
                         if (serverConfig.api) Object.assign(API_CONFIG, serverConfig.api);
                         if (serverConfig.ui) Object.assign(UI, serverConfig.ui);
                         // ✅ 处理预设数据（由 PromptManager 管理）
@@ -11825,8 +10681,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                         localStorage.setItem('gg_api', JSON.stringify(API_CONFIG));
                         localStorage.setItem('gg_ui', JSON.stringify(UI));
 
-                        $('#gg_c_enabled').prop('checked', C.enabled);
-                        $('#gg_c_auto_bf').prop('checked', C.autoBackfill);
                         $('#gg_c_auto_sum').prop('checked', C.autoSummary);
                     }
 
@@ -11889,33 +10743,15 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                     return;
                 }
 
-                // ✅ 简单读取 UI 状态，不做任何强制逻辑
-                C.enabled = $('#gg_c_enabled').is(':checked');
-                C.autoBackfill = $('#gg_c_auto_bf').is(':checked');
-
-                console.log(`💾 [配置同步] 实时填表:${C.enabled} | 批量填表:${C.autoBackfill}`);
-
-                C.autoBackfillFloor = parseInt($('#gg_c_auto_bf_floor').val()) || 10;
-                C.autoBackfillPrompt = $('#gg_c_auto_bf_prompt').is(':checked');
-                C.autoBackfillSilent = $('#gg_c_auto_bf_silent').is(':checked');
-                C.autoBackfillDelay = $('#gg_c_auto_bf_delay').is(':checked');
-                C.autoBackfillDelayCount = parseInt($('#gg_c_auto_bf_delay_count').val()) || 5;
-                C.contextLimit = $('#gg_c_limit_on').is(':checked');
-                C.contextLimitCount = parseInt($('#gg_c_limit_count').val());
-                C.autoCalculateParams = $('#gg_c_auto_calc').is(':checked');
-                C.tableInj = $('#gg_c_table_inj').is(':checked');
                 C.autoSummary = $('#gg_c_auto_sum').is(':checked');
                 C.autoSummaryFloor = parseInt($('#gg_c_auto_floor').val());
                 C.autoSummaryPrompt = $('#gg_c_auto_sum_prompt').is(':checked');
                 C.autoSummarySilent = $('#gg_c_auto_sum_silent').is(':checked');
                 C.autoSummaryDelay = $('#gg_c_auto_sum_delay').is(':checked');
                 C.autoSummaryDelayCount = parseInt($('#gg_c_auto_sum_delay_count').val()) || 5;
-                C.autoSummaryHideContext = $('#gg_c_auto_sum_hide').is(':checked');
-                C.autoBigSummary = $('#gg_c_big_sum').is(':checked');
-                C.autoBigSummaryFloor = parseInt($('#gg_c_big_sum_floor').val()) || 100;
-                C.autoBigSummaryFloorManual = !!bigSummaryFloorManualOverride;
-                C.autoBigSummaryDelay = $('#gg_c_auto_big_delay').is(':checked');
-                C.autoBigSummaryDelayCount = parseInt($('#gg_c_auto_big_delay_count').val()) || 6;
+                C.summaryRowAction = ['keep', 'hide', 'delete'].includes($('#gg_c_summary_row_action').val())
+                    ? $('#gg_c_summary_row_action').val()
+                    : 'hide';
                 C.filterTags = $('#gg_c_filter_tags').val();
                 C.filterTagsWhite = $('#gg_c_filter_tags_white').val();
                 if (!Array.isArray(C.filterTagPresets)) C.filterTagPresets = [];
@@ -11932,14 +10768,9 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 if (!C.filterTagPresets.some(p => p.id === C.filterTagActivePresetId)) {
                     C.filterTagActivePresetId = '';
                 }
-                C.syncWorldInfo = $('#gg_c_sync_wi').is(':checked');
                 C.vectorEnabled = $('#gg_c_vector_enabled').is(':checked');
                 C.autoVectorizeSummary = $('#gg_c_auto_vectorize').is(':checked');
-
-                // ✅ 保存世界书自定义配置
-                m.wiConfig.bookName = $('#gg_wi_book_name').val().trim();
-
-                API_CONFIG.summarySource = $('input[name="cfg-sum-src"]:checked').val();
+                API_CONFIG.summarySource = 'table';
 
                 // ✅ 修复：表格选择已移到弹窗模态框中，有自己的保存逻辑
                 // 此处不再读取复选框，避免因找不到元素而错误重置 C.autoSummaryTargetTables
@@ -11972,160 +10803,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 if (typeof saveAllSettingsToCloud === 'function') {
                     saveAllSettingsToCloud().catch(() => { });
                 }
-            });
-
-            $('#gg_c_enabled').on('change', async function () {
-                // 🛡️ 防止配置恢复期间触发保存（修复移动端竞态条件）
-                if (isRestoringSettings) {
-                    console.log('⏸️ [gg_c_enabled] 配置恢复中，跳过保存');
-                    return;
-                }
-
-                const isChecked = $(this).is(':checked');
-
-                // ✅ [UI互斥] 开启实时填表时，自动关闭批量填表
-                if (isChecked) {
-                    $('#gg_c_auto_bf').prop('checked', false);
-                    $('#gg_auto_bf_settings').slideUp();
-                }
-
-                // ✅ [防丢失] 同步所有UI配置（会根据新的checkbox状态更新C.enabled和C.autoBackfill）
-                syncUIToConfig();
-
-                // ✅ Per-Chat Configuration: Save to current chat immediately
-                m.save(false, true); // 配置更改立即保存
-                console.log('💾 [每聊配置] 已保存实时填表设置到当前聊天:', isChecked);
-
-                // ✅ 同步到云端
-                if (typeof saveAllSettingsToCloud === 'function') {
-                    saveAllSettingsToCloud().catch(err => {
-                        console.warn('⚠️ [实时填表开关] 云端同步失败:', err);
-                    });
-                }
-            });
-
-            $('#gg_c_auto_bf').on('change', async function () {
-                // 🛡️ 防止配置恢复期间触发保存（修复移动端竞态条件）
-                if (isRestoringSettings) {
-                    console.log('⏸️ [gg_c_auto_bf] 配置恢复中，跳过保存');
-                    return;
-                }
-
-                const isChecked = $(this).is(':checked');
-
-                // ✅ [UI互斥] 开启批量填表时，自动关闭实时填表
-                if (isChecked) {
-                    $('#gg_auto_bf_settings').slideDown();
-                    $('#gg_c_enabled').prop('checked', false);
-                } else {
-                    $('#gg_auto_bf_settings').slideUp();
-                }
-
-                // ✅ [防丢失] 同步所有UI配置（会根据新的checkbox状态更新C.enabled和C.autoBackfill）
-                syncUIToConfig();
-
-                // ✅ Per-Chat Configuration: Save to current chat immediately
-                m.save(false, true); // 配置更改立即保存
-                console.log('💾 [每聊配置] 已保存批量填表设置到当前聊天:', isChecked);
-
-                // ✅ 同步到云端
-                if (typeof saveAllSettingsToCloud === 'function') {
-                    saveAllSettingsToCloud().catch(err => {
-                        console.warn('⚠️ [批量填表开关] 云端同步失败:', err);
-                    });
-                }
-            });
-
-            // 🆕 隐藏楼层与总结后隐藏的互斥逻辑
-            $('#gg_c_limit_on').on('change', function () {
-                const isChecked = $(this).is(':checked');
-
-                if (isChecked) {
-                    // 开启隐藏楼层时，自动关闭总结后隐藏
-                    if ($('#gg_c_auto_sum_hide').is(':checked')) {
-                        $('#gg_c_auto_sum_hide').prop('checked', false);
-                        toastr.info('已自动关闭"总结后隐藏原楼层"功能', '互斥提示', { timeOut: 3000 });
-                    }
-                }
-
-                syncUIToConfig();
-                m.save(false, true);
-            });
-
-            $('#gg_c_auto_sum_hide').on('change', function () {
-                const isChecked = $(this).is(':checked');
-
-                if (isChecked) {
-                    // 开启总结后隐藏时，自动关闭隐藏楼层
-                    if ($('#gg_c_limit_on').is(':checked')) {
-                        $('#gg_c_limit_on').prop('checked', false);
-                        toastr.info('已自动关闭"隐藏楼层"功能', '互斥提示', { timeOut: 3000 });
-                    }
-                }
-
-                syncUIToConfig();
-                m.save(false, true);
-            });
-
-            // ✨ 智能计算开关保存
-            $('#gg_c_auto_calc').on('change', function () {
-                C.autoCalculateParams = $(this).is(':checked');
-                // 重新开启智能联动时，清除手动覆盖状态，恢复自动计算
-                if (C.autoCalculateParams) {
-                    bigSummaryFloorManualOverride = false;
-                }
-                syncUIToConfig();
-                if (C.autoCalculateParams) {
-                    runSmartCalculation('summary', $('#gg_c_auto_floor').val());
-                }
-                m.save(false, true);
-            });
-
-            // ✨ 核心联动计算引擎
-            function runSmartCalculation(source, value) {
-                if (!$('#gg_c_auto_calc').is(':checked')) return;
-                const v = parseInt(value);
-                if (isNaN(v) || v <= 0) return;
-
-                if (source === 'limit') {
-                    // 场景2：使用隐藏楼层
-                    // 用户输入：隐藏后保留层数（如 25）
-                    // 批量填表 = 保留层数 - 5
-                    $('#gg_c_auto_bf_floor').val(Math.max(5, v - 5));
-                    // 批量填表滞后 = 2 楼
-                    $('#gg_c_auto_bf_delay_count').val(2);
-                    // 保留用户设置的小总结楼层，不因隐藏楼层调整而覆盖
-                    // 小总结滞后 = 3 楼
-                    $('#gg_c_auto_sum_delay_count').val(3);
-                    // 大总结 = 100 楼（固定值）
-                    if (!bigSummaryFloorManualOverride) {
-                        $('#gg_c_big_sum_floor').val(100);
-                    }
-                    // 大总结滞后 = 4 楼
-                    $('#gg_c_auto_big_delay_count').val(4);
-                } else if (source === 'summary') {
-                    // 场景1：使用上下文管理（隐藏楼层关闭）
-                    if (!$('#gg_c_limit_on').is(':checked')) {
-                        // 大总结 = 自动总结 × 5，但智能联动最高封顶 100
-                        if (!bigSummaryFloorManualOverride) {
-                            const smartBigFloor = Math.min(100, Math.max(50, v * 5));
-                            $('#gg_c_big_sum_floor').val(smartBigFloor);
-                        }
-                        // 大总结滞后 = 5 楼
-                        $('#gg_c_auto_big_delay_count').val(5);
-                    }
-                }
-                syncUIToConfig();
-            }
-
-            // ✨ 绑定输入事件
-            $('#gg_c_limit_count').on('input', function () { runSmartCalculation('limit', $(this).val()); });
-            $('#gg_c_auto_floor').on('input', function () { runSmartCalculation('summary', $(this).val()); });
-            $('#gg_c_big_sum_floor').on('change', function () {
-                if (!$('#gg_c_auto_calc').is(':checked')) return;
-                bigSummaryFloorManualOverride = true;
-                syncUIToConfig();
-                m.save(false, true);
             });
 
             // ==================== 标签过滤预设：保存/切换/删除 ====================
@@ -12376,9 +11053,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 console.log('🔒 [配置保存] 已锁定，暂停其他 loadConfig 调用');
 
                 try {
-                    // ✨ 保存旧配置状态，用于检测世界书同步的变化
-                    const oldSyncWorldInfo = C.syncWorldInfo;
-
                     // ✅ 步骤 1：调用统一的同步函数（复用代码，避免重复）
                     syncUIToConfig();
                     console.log('✅ [配置保存] 步骤1：内存对象已更新（通过 syncUIToConfig）');
@@ -12386,11 +11060,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                     // ✅ 步骤 1.5：【核心修复】立即将 C 写入当前角色的存档！
                     m.save(false, true); // 配置更改立即保存
                     console.log('✅ [配置保存] 已同步至当前角色存档');
-
-                    // ✨ 检测世界书同步从开启到关闭的状态变化，提示用户手动禁用世界书条目
-                    if (oldSyncWorldInfo === true && C.syncWorldInfo === false) {
-                        await customAlert('⚠️ 检测到您关闭了世界书同步\n\n请务必手动前往酒馆顶部的【世界书/知识书】面板，禁用或删除 [Memory_Context_Auto] 条目，否则旧的总结内容仍会持续发送给 AI。\n\n💡 互斥机制：\n• 开启同步：由世界书发送总结（插件不重复注入）\n• 关闭同步：由插件注入总结（需手动清理世界书）', '重要提示');
-                    }
 
                     // ✅ 步骤 2：异步保存到云端（不阻塞用户操作）
                     await saveAllSettingsToCloud();
@@ -12410,57 +11079,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
 
             $('#gg_open_api').on('click', () => navTo('AI总结配置', shapi));
             $('#gg_open_pmt').on('click', () => navTo('提示词管理', window.Gaigai.PromptManager.showPromptManager));
-
-            // ✨✨✨ 强制覆盖世界书 (手动绑定版) ✨✨✨
-            $('#gg_btn_force_sync_wi').off('click').on('click', async function () {
-                // 0. 检查世界书同步是否开启
-                if (!C.syncWorldInfo) {
-                    await customAlert('⚠️ 世界书同步已关闭\n\n请先在配置中开启【同步到世界书】选项。', '功能未启用');
-                    return;
-                }
-
-                const summarySheet = m.get(m.s.length - 1);
-
-                // 1. 安全拦截
-                if (!summarySheet || summarySheet.r.length === 0) {
-                    await customAlert('❌ 总结表格为空！\n\n无法执行覆盖操作。', '安全拦截');
-                    return;
-                }
-
-                // 2. 确认提示
-                const confirmMsg = `⚠️ 确定要强制覆盖吗？\n\n1. 将重新生成当前角色的记忆世界书文件。\n2. 总结表中的 ${summarySheet.r.length} 条记录将被写入。`;
-                if (!await customConfirm(confirmMsg, '覆盖确认')) {
-                    return;
-                }
-
-                const btn = $(this);
-                const oldText = btn.html();
-                btn.html('<i class="fa-solid fa-spinner fa-spin"></i> 处理中...').prop('disabled', true);
-
-                try {
-                    // ✅ 保存最新的书名配置到内存
-                    m.wiConfig.bookName = $('#gg_wi_book_name').val().trim();
-                    m.save(false, true); // 世界书配置更改立即保存
-
-                    console.log('⚡ [强制覆盖] 调用统一同步接口...');
-                    // 调用世界书管理器的统一同步接口（强制覆盖模式）
-                    await window.Gaigai.WI.syncToWorldInfo(null, true);
-
-                    // 成功提示
-                    const bookName = window.Gaigai.WI._getStableBookName(m.gid());
-                    if (typeof toastr !== 'undefined') {
-                        toastr.success(`文件 ${bookName} 已生成。\n请在上方"世界/知识书"下拉框中手动选中它。`, '覆盖成功', { timeOut: 5000 });
-                    } else {
-                        await customAlert(`✅ 文件已生成！\n\n请手动在酒馆上方的"世界/知识书"下拉框中选择：\n${bookName}`, '覆盖成功');
-                    }
-
-                } catch (e) {
-                    console.error(e);
-                    await customAlert(`操作失败: ${e.message}`, '错误');
-                } finally {
-                    btn.html(oldText).prop('disabled', false);
-                }
-            });
 
             // ==================== 向量化设置按钮 ====================
             $('#gg_open_vector').off('click').on('click', () => {
@@ -12585,520 +11203,55 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
      * ✨ 已优化：加入防抖和延迟机制，确保 AI 消息完全生成后再处理
      * @param {number} id - 消息ID（可选，默认为最新消息）
      */
-    function omsg(id) {
-        // 🔴 全局主开关守卫
-        if (!C.masterSwitch) return;
+    async function handleAutoTableSummary() {
+        if (!C.masterSwitch || !C.autoSummary || window.isSummarizing || window.Gaigai.isTableSummaryRunning) return;
+        if (!window.Gaigai.SummaryManager || typeof window.Gaigai.SummaryManager.callAIForSummary !== 'function') return;
 
+        const ctx = m.ctx();
+        const currentCount = Array.isArray(ctx?.chat) ? ctx.chat.length : 0;
+        if (!currentCount) return;
+
+        const lastIndex = API_CONFIG.lastSummaryIndex || 0;
+        const interval = parseInt(C.autoSummaryFloor) || 50;
+        const delay = C.autoSummaryDelay ? (parseInt(C.autoSummaryDelayCount) || 0) : 0;
+        if (currentCount - lastIndex < interval + delay) return;
+        if ($('.g-ov').length > 0) return;
+
+        if (!C.autoSummaryPrompt) {
+            const confirmed = await customConfirm('已达到自动总结间隔。是否总结当前记忆表格？', '自动总结');
+            if (!confirmed) return;
+        }
+
+        const selectedTables = Array.isArray(C.autoSummaryTargetTables) && C.autoSummaryTargetTables.length > 0
+            ? C.autoSummaryTargetTables
+            : m.s.slice(0, -1).map((_, index) => index);
+
+        window.Gaigai.isTableSummaryRunning = true;
         try {
-            const x = m.ctx();
-            if (!x || !x.chat) return;
-            const currentSessionId = m.gid(); // 🔒 锁定当前会话ID
-
-
-            // 确定当前触发的消息ID
-            const i = typeof id === 'number' ? id : x.chat.length - 1;
-            const mg = x.chat[i];
-
-            if (!mg) return; // 消息不存在则返回
-
-            const msgKey = i.toString();
-            const isUserMessage = mg.is_user; // 标记是否为用户消息
-
-            // 🛑 [核心修复] 移除 processedMessages 的拦截
-            // 只要 omsg 被调用，就说明要么是新消息，要么是重Roll/Swipe，必须重新计算
-            // 我们只保留定时器防抖，防止流式传输时频繁触发
-
-            // 🧹 防抖：清除该楼层的旧定时器
-            if (pendingTimers[msgKey]) {
-                clearTimeout(pendingTimers[msgKey]);
-                console.log(`🔄 [防抖] 已清除消息 ${msgKey} 的旧定时器`);
+            const result = await window.Gaigai.SummaryManager.callAIForSummary(
+                null,
+                currentCount,
+                'table',
+                C.autoSummarySilent,
+                false,
+                false,
+                selectedTables,
+                false,
+                false,
+                C.summaryRowAction
+            );
+            if (result?.success || result?.error === '没有可总结的表格行') {
+                API_CONFIG.lastSummaryIndex = currentCount;
+                localStorage.setItem(AK, JSON.stringify(API_CONFIG));
+                m.save(false, true);
             }
-
-            // ⏳ 保存新的定时器ID，延迟 500ms 执行 (给流式传输缓冲时间，可调整为500-2000ms)
-            console.log(`⏳ [延迟] 消息 ${msgKey} 将在 0.5 秒后处理（等待流式传输完成）`);
-            pendingTimers[msgKey] = setTimeout(() => {
-                try {
-
-                    // 🛑 [防串味] 执行前再次检查ID，不对立刻停止
-                    if (m.gid() !== currentSessionId) {
-                        console.warn('🛑 [安全拦截] 会话已变更，终止写入！');
-                        return;
-                    }
-
-                    // ✨✨✨ [防冲突] 检查是否正在执行总结，避免快照冲突
-                    if (window.isSummarizing) {
-                        console.log('⏸️ [实时填表] 检测到正在执行总结，延迟处理...');
-                        // 延迟 2 秒后重新尝试
-                        setTimeout(() => omsg(i), 2000);
-                        return;
-                    }
-
-                    // ✅ [修复进度指针重置] 在核心计算前加载最新配置，防止 API_CONFIG.lastBackfillIndex 被后台同步重置
-                    m.load();
-
-                    // 重新获取最新上下文
-                    const x = m.ctx();
-                    if (!x || !x.chat) return;
-                    const mg = x.chat[i];
-                    if (!mg) return; // 消息可能被删了
-
-                    // 🛡️ 重复渲染拦截：同一楼层 + 同一分支 + 同一内容，不重复回滚/写表
-                    const currentSignature = buildMessageProcessSignature(mg);
-                    if (!window.Gaigai.isSwiping && processedMessageSignatures[msgKey] === currentSignature) {
-                        console.log(`⏭️ [重复渲染拦截] 第 ${i} 楼签名未变化，跳过重复处理（兼容二次请求插件）`);
-                        return;
-                    }
-                    processedMessageSignatures[msgKey] = currentSignature;
-
-                    console.log(`⚡ [核心计算] 开始处理第 ${i} 楼 (Swipe: ${mg.swipe_id || 0})`);
-
-
-                    // ============================================================
-                    // 步骤 1: 回滚到基准线 (Base State)
-                    // 逻辑：第N楼的状态 = 第N-1楼的快照 + 第N楼的新指令
-                    // ============================================================
-                    if (C.enabled && !C.autoBackfill) {
-                        let baseIndex = i - 1;
-                        let baseKey = null;
-
-                        // 倒序查找最近的一个有效存档（最远找到 -1 创世快照）
-                        while (baseIndex >= -1) {
-                            const key = baseIndex.toString();
-                            if (snapshotHistory[key]) {
-                                baseKey = key;
-                                break;
-                            }
-                            baseIndex--;
-                        }
-
-                        // 🛡️ 基准快照检查
-                        if (baseKey) {
-                            // 🛡️ [防清空补丁] 如果找到的是创世快照(-1)，但当前已经是聊天中途(i > 2)，
-                            // 说明中间快照丢失（通常是刷新后）。此时绝对禁止回滚到空状态，必须信任当前加载的数据。
-                            if (baseKey === '-1' && i > 2) {
-                                console.warn(`🛑 [智能保护] 第 ${i} 楼缺失前序快照，禁止回滚到创世快照(-1)，保留当前内存数据作为基准。`);
-                                // 不执行 restoreSnapshot，直接使用当前 m.s 中的数据
-                            } else {
-                                // 🛡️ [智能保护] 深度内容比较，区分"数据加载"和"用户修改"
-                                const snapshot = snapshotHistory[baseKey];
-                                if (snapshot && snapshot.data) {
-                                    // 🚩 [Swipe模式检测] 优先检查Swipe标志
-                                    if (window.Gaigai.isSwiping) {
-                                        // Swipe操作：用户明确想要撤销，强制回滚，无视所有智能保护
-                                        console.log(`↔️ [Swipe模式] 检测到 Swipe 标志，强制对齐基准快照 [${baseKey}] (无视智能保护)`);
-                                        restoreSnapshot(baseKey, true); // Force=true 跳过时间戳保护
-                                        window.Gaigai.isSwiping = false; // 重置标志，防止影响后续正常消息
-                                    } else {
-                                        // 正常模式：应用智能保护逻辑
-                                        // 1. 计算内容哈希值
-                                        const currentHash = calculateTableHash(m.s.slice(0, -1)); // 排除总结表
-                                        const snapshotHash = calculateTableHash(snapshot.data);
-
-                                        // 2. 逻辑判断
-                                        if (currentHash === snapshotHash) {
-                                            // 情况A: 内容完全一致
-                                            // 即使行数>0，也说明当前状态与快照完全匹配
-                                            // 可以安全回滚（例如Swipe/重新生成场景）
-                                            restoreSnapshot(baseKey);
-                                            console.log(`↺ [同步] 内容一致(Hash匹配)，正常回滚至快照 [${baseKey}]`);
-                                        } else {
-                                            // 情况B: 内容不同
-                                            // 检查行数以判断用户意图
-                                            const snapshotRows = snapshot.data.reduce((acc, s) => acc + (s.r ? s.r.length : 0), 0);
-                                            const currentRows = m.s.reduce((acc, s) => acc + (s.r ? s.r.length : 0), 0);
-
-                                            if (currentRows > snapshotRows) {
-                                                // FIX: If it is a swipe (swipe_id > 0), force rollback because the extra rows are likely from the previous AI generation, not user input.
-                                                if (mg.swipe_id && mg.swipe_id > 0) {
-                                                    console.log(`↺ [同步-Swipe修正] 检测到 Swipe 重生成 (id:${mg.swipe_id})，强制回滚前次生成的数据`);
-                                                    restoreSnapshot(baseKey, true);
-                                                } else {
-                                                    // Original protection logic
-                                                    // 用户可能手动导入了数据或添加了行
-                                                    console.warn(`🛑 [智能保护] 检测到数据变更(Hash不同)且行数增加 (${currentRows} > ${snapshotRows})。视为用户手动导入，取消回滚。`);
-                                                    saveSnapshot(baseKey);
-                                                }
-                                            } else if (currentRows === snapshotRows) {
-                                                // 用户可能编辑了单元格内容
-                                                console.warn(`🛑 [智能保护] 检测到数据变更(Hash不同)但行数不变 (${currentRows} 行)。视为用户编辑单元格，取消回滚。`);
-                                                saveSnapshot(baseKey);
-                                            } else {
-                                                // 当前 < 快照（用户手动删除了行？或Swipe？）
-                                                // 为确保AI同步，允许回滚
-                                                restoreSnapshot(baseKey);
-                                                console.log(`↺ [同步] 数据减少 (${currentRows} < ${snapshotRows})，执行回滚以同步状态`);
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    // 快照数据不存在，执行正常回滚
-                                    restoreSnapshot(baseKey);
-                                    console.log(`↺ [同步] 基准重置成功：已回滚至快照 [${baseKey}]`);
-                                }
-                            }
-                        } else {
-                            // [新增] 熔断机制：如果是非第一条消息且找不到基准快照，禁止继续写入
-                            // 这通常发生在重Roll时丢失了上一个状态，继续写入会导致数据重复叠加
-                            if (i > 0) {
-                                console.error(`🛑 [熔断] 第 ${i} 楼找不到前序快照，已停止自动写入以防止数据污染/重复。`);
-                            }
-                        }
-
-                        // ============================================================
-                        // 步骤 2-3: 读取和解析指令 (仅AI消息)
-                        // 用户消息跳过此步骤，直接保存快照
-                        // ============================================================
-                        if (!isUserMessage) {
-                            // 获取当前显示的文本 (强制读取 swipes 里的对应分支)
-                            const swipeId = mg.swipe_id ?? 0;
-                            let tx = '';
-                            if (mg.swipes && mg.swipes.length > swipeId) {
-                                tx = mg.swipes[swipeId];
-                            } else {
-                                tx = mg.mes || ''; // 兜底
-                            }
-
-                            // 解析并执行指令
-                            const cs = prs(tx);
-                            if (cs.length > 0) {
-                                console.log(`⚡ [写入] 识别到 ${cs.length} 条指令，正在写入表格...`);
-                                exe(cs);
-                                m.save(false, true); // 立即保存到本地存储（AI 生成的新记忆非常重要）
-
-                                // ✅ [修复] 实时填表只更新填表指针，不更新总结指针
-                                // 原因：实时填表不应该阻止自动总结触发，两者是独立的功能
-                                API_CONFIG.lastBackfillIndex = i;
-                                localStorage.setItem(AK, JSON.stringify(API_CONFIG));
-
-                                // ✅ 同步到云端，防止 loadConfig 回滚
-                                if (typeof saveAllSettingsToCloud === 'function') {
-                                    saveAllSettingsToCloud().catch(err => {
-                                        console.warn('⚠️ [实时填表] 云端同步失败:', err);
-                                    });
-                                }
-
-                                console.log(`✅ [实时填表] 填表指针已更新至第 ${i} 楼`);
-                            } else {
-                                console.log(`Testing: 第 ${i} 楼无指令，保持基准状态。`);
-                            }
-                        } else {
-                            // 用户消息：不解析指令，只保存当前状态作为快照
-                            console.log(`👤 [用户消息] 第 ${i} 楼为用户消息，跳过指令解析，仅保存快照`);
-                        }
-
-                        // ============================================================
-                        // 步骤 4: 生成当前楼层的新快照 (Save Snapshot i)
-                        // 这样第 i+1 楼就能用这个作为基准了
-                        // ============================================================
-                        const newSnapshot = {
-                            data: m.all().slice(0, -1).map(sh => JSON.parse(JSON.stringify(sh.json()))), // 只保存数据表
-                            summarized: JSON.parse(JSON.stringify(summarizedRows)),
-                            timestamp: Date.now()
-                        };
-                        snapshotHistory[msgKey] = newSnapshot;
-                        console.log(`📸 [快照] 第 ${i} 楼的新状态已封存。`);
-
-                        cleanOldSnapshots();
-                    }
-
-                    // 🆕 [修复3] 确保在所有模式下都保存快照
-                    // 如果上面的实时填表模式没有执行（因为 C.autoBackfill = true），这里补充保存
-                    if (C.enabled && C.autoBackfill && !snapshotHistory[msgKey]) {
-                        const newSnapshot = {
-                            data: m.all().slice(0, -1).map(sh => JSON.parse(JSON.stringify(sh.json()))),
-                            summarized: JSON.parse(JSON.stringify(summarizedRows)),
-                            timestamp: Date.now()
-                        };
-                        snapshotHistory[msgKey] = newSnapshot;
-                        console.log(`📸 [快照-补充] 第 ${i} 楼的新状态已封存（自动批量填表模式）。`);
-                        cleanOldSnapshots();
-                    }
-
-                    // 🚦 标志位
-                    let hasBackfilledThisTurn = false;
-
-                    // ============================================================
-                    // 模块 A-2: 自动批量填表
-                    // ============================================================
-                    console.log('[Auto Backfill Check] Enabled:', C.autoBackfill, 'Cooling:', isInitCooling);
-                    // ✅ 修复：移除 C.enabled 依赖，移除 isInitCooling 限制
-                    if (C.autoBackfill) {
-                        // 🔧 修复1：强制加载最新数据，防止读取到过期的 lastBackfillIndex
-                        m.load();
-
-                        const lastBfIndex = API_CONFIG.lastBackfillIndex || 0;
-                        const currentCount = x.chat.length;
-                        const diff = currentCount - lastBfIndex;
-
-                        // 🔧 修复2：强制类型转换，防止字符串拼接错误
-                        const bfInterval = parseInt(C.autoBackfillFloor) || 10;
-
-                        // 🔧 修复3：严格布尔值检查，防止延时设置被忽略
-                        const bfDelay = (C.autoBackfillDelay === true) ? (parseInt(C.autoBackfillDelayCount) || 0) : 0;
-
-                        // 计算有效阈值
-                        const bfThreshold = bfInterval + bfDelay;
-
-                        // 🔧 修复4：详细的调试日志
-                        console.log(`🔍 [Auto Backfill 触发检查] 当前:${currentCount}, 上次:${lastBfIndex}, 差值:${diff}`);
-                        console.log(`🔍 [阈值计算] 间隔:${bfInterval}, 延迟:${bfDelay}, 阈值:${bfThreshold}, 延迟开关:${C.autoBackfillDelay}`);
-
-                        if (diff >= bfThreshold) {
-                            // 🛡️ UI 冲突检测：检查是否有插件弹窗正在显示
-                            if ($('.g-ov').length > 0) {
-                                console.log('⏸️ [自动批量填表] 检测到插件弹窗打开，跳过本次触发以防止覆盖用户界面');
-                                return;
-                            }
-
-                            // 计算目标结束点 (Target End Floor)
-                            // 如果开启延迟：结束点 = 上次位置 + 间隔 (只处理这一段，后面的留作缓冲)
-                            // 如果关闭延迟：结束点 = 当前位置 (处理所有未记录的内容，保持旧逻辑)
-                            const targetEndIndex = Math.min(lastBfIndex + bfInterval, currentCount); // 强制严格按设定的步长切分，解决多1层问题
-
-                            console.log(`⚡ [Auto Backfill] 触发! 填表范围: ${lastBfIndex}-${targetEndIndex}`);
-
-                            // ✨ 发起模式逻辑（与完成模式一致）：勾选=静默，未勾选=弹窗
-                            if (!C.autoBackfillPrompt) {
-                                // 弹窗模式（未勾选时）
-                                showAutoTaskConfirm('backfill', currentCount, lastBfIndex, bfThreshold).then(result => {
-                                    if (result.action === 'confirm') {
-                                        if (result.postpone > 0) {
-                                            // 用户选择顺延
-                                            API_CONFIG.lastBackfillIndex = currentCount - bfThreshold + result.postpone;
-                                            localStorage.setItem(AK, JSON.stringify(API_CONFIG));
-
-                                            // ✅✅✅ 修复：同步到云端，防止 loadConfig 回滚
-                                            if (typeof saveAllSettingsToCloud === 'function') {
-                                                saveAllSettingsToCloud().catch(err => {
-                                                    console.warn('⚠️ [填表顺延] 云端同步失败:', err);
-                                                });
-                                            }
-
-                                            m.save(false, true); // ✅ 修复：立即同步进度到聊天记录
-                                            console.log(`⏰ [批量填表] 顺延 ${result.postpone} 楼，新触发点：${API_CONFIG.lastBackfillIndex + bfThreshold}`);
-                                            if (typeof toastr !== 'undefined') {
-                                                toastr.info(`批量填表已顺延 ${result.postpone} 楼`, '记忆表格');
-                                            }
-                                        } else {
-                                            // 立即执行
-                                            if (window.Gaigai.BackfillManager && typeof window.Gaigai.BackfillManager.autoRunBackfill === 'function') {
-                                                window.Gaigai.BackfillManager.autoRunBackfill(lastBfIndex, targetEndIndex, false, -1, '', 'chat', false, null, true);
-                                                hasBackfilledThisTurn = true;
-                                            }
-                                        }
-                                    } else {
-                                        console.log(`🚫 [批量填表] 用户取消`);
-                                    }
-                                });
-                            } else {
-                                // 静默模式（勾选时）：直接执行
-                                if (window.Gaigai.BackfillManager && typeof window.Gaigai.BackfillManager.autoRunBackfill === 'function') {
-                                    window.Gaigai.BackfillManager.autoRunBackfill(lastBfIndex, targetEndIndex, false, -1, '', 'chat', false, null, true);
-                                    hasBackfilledThisTurn = true;
-                                }
-                            }
-                        }
-                    }
-
-                    // 先计算大总结是否到期。大总结到期时，本轮不再启动小总结，
-                    // 避免 0-100 与 80-100 这类边界区间同时生成。
-                    let autoBigSummaryTask = null;
-                    if (C.autoBigSummary) {
-                        const pendingBigEnd = (window.Gaigai && typeof window.Gaigai.pendingBigSummaryEnd === 'number')
-                            ? window.Gaigai.pendingBigSummaryEnd
-                            : 0;
-                        const lastBigIndex = Math.max(API_CONFIG.lastBigSummaryIndex || 0, pendingBigEnd);
-                        const currentCount = x.chat.length;
-                        const newBigMsgCount = currentCount - lastBigIndex;
-                        const bigInterval = C.autoBigSummaryFloor || 100;
-                        const bigDelay = C.autoBigSummaryDelay ? (parseInt(C.autoBigSummaryDelayCount) || 6) : 0;
-                        const bigThreshold = bigInterval + bigDelay;
-
-                        if (newBigMsgCount >= bigThreshold) {
-                            autoBigSummaryTask = {
-                                lastBigIndex,
-                                currentCount,
-                                bigInterval,
-                                bigDelay,
-                                bigThreshold,
-                                targetEndIndex: Math.min(lastBigIndex + bigInterval, currentCount)
-                            };
-                        }
-                    }
-
-                    // ============================================================
-                    // 模块 B: 自动总结
-                    // ============================================================
-                    if (C.autoSummary) { // ✨ 允许触发
-                        const lastIndex = API_CONFIG.lastSummaryIndex || 0;
-                        const currentCount = x.chat.length;
-                        const newMsgCount = currentCount - lastIndex;
-
-                        // 计算有效阈值
-                        const sumInterval = C.autoSummaryFloor || 50;
-                        // 如果开启延迟，则阈值 = 间隔 + 延迟层数；否则阈值 = 间隔
-                        const sumDelay = C.autoSummaryDelay ? (C.autoSummaryDelayCount || 0) : 0;
-                        const sumThreshold = sumInterval + sumDelay;
-
-                        if (newMsgCount >= sumThreshold) {
-                            if (autoBigSummaryTask || window.Gaigai.isBigSummaryRunning || (window.Gaigai.pendingBigSummaryEnd || 0) > lastIndex) {
-                                console.log('⏸️ [自动总结] 自动大总结已到期或正在执行，跳过本轮小总结以避免区间重叠');
-                            } else {
-                                // 🛡️ UI 冲突检测：检查是否有插件弹窗正在显示
-                                if ($('.g-ov').length > 0) {
-                                    console.log('⏸️ [自动总结] 检测到插件弹窗打开，跳过本次触发以防止覆盖用户界面');
-                                    return;
-                                }
-
-                                // 计算目标结束点 (Target End Floor)
-                                // 如果开启延迟：结束点 = 上次位置 + 间隔 (只处理这一段，后面的留作缓冲)
-                                // 如果关闭延迟：结束点 = 当前位置 (处理所有未记录的内容，保持旧逻辑)
-                                const targetEndIndex = Math.min(lastIndex + sumInterval, currentCount); // 强制严格按设定的步长切分，解决多1层问题
-
-                                if (hasBackfilledThisTurn) {
-                                    console.log(`🚦 [防撞车] 总结任务顺延。`);
-                                } else {
-                                    console.log(`🤖 [Auto Summary] 触发逻辑! 当前:${currentCount}, 上次:${lastIndex}, 间隔:${sumInterval}, 延迟:${sumDelay}, 阈值:${sumThreshold}, 目标结束点:${targetEndIndex}`);
-
-                                    // ✨ 发起模式逻辑（与完成模式一致）：勾选=静默，未勾选=弹窗
-                                    if (!C.autoSummaryPrompt) {
-                                        // 弹窗模式（未勾选时）
-                                        showAutoTaskConfirm('summary', currentCount, lastIndex, sumThreshold).then(result => {
-                                            if (result.action === 'confirm') {
-                                                if (result.postpone > 0) {
-                                                    // 用户选择顺延
-                                                    API_CONFIG.lastSummaryIndex = currentCount - sumThreshold + result.postpone;
-                                                    localStorage.setItem(AK, JSON.stringify(API_CONFIG));
-
-                                                    // ✅✅✅ 修复：同步到云端，防止 loadConfig 回滚
-                                                    if (typeof saveAllSettingsToCloud === 'function') {
-                                                        saveAllSettingsToCloud().catch(err => {
-                                                            console.warn('⚠️ [总结顺延] 云端同步失败:', err);
-                                                        });
-                                                    }
-
-                                                    m.save(false, true); // ✅ 修复：立即同步进度到聊天记录
-                                                    console.log(`⏰ [自动总结] 顺延 ${result.postpone} 楼，新触发点：${API_CONFIG.lastSummaryIndex + sumThreshold}`);
-                                                    if (typeof toastr !== 'undefined') {
-                                                        toastr.info(`自动总结已顺延 ${result.postpone} 楼`, '记忆表格');
-                                                    }
-                                                } else {
-                                                    if (window.Gaigai.isBigSummaryRunning || (window.Gaigai.pendingBigSummaryEnd || 0) > lastIndex) {
-                                                        console.log('⏸️ [自动总结] 确认执行时检测到大总结占用，取消本轮小总结');
-                                                        return;
-                                                    }
-                                                    // 立即执行（传入目标结束点、模式、静默参数和表格范围）
-                                                    window.Gaigai.SummaryManager.callAIForSummary(
-                                                        null,
-                                                        targetEndIndex,
-                                                        null,
-                                                        C.autoSummarySilent,
-                                                        false,
-                                                        false,
-                                                        C.autoSummaryTargetTables,  // 🆕 传入配置的表格范围
-                                                        false,
-                                                        true
-                                                    );
-                                                }
-                                            } else {
-                                                console.log(`🚫 [自动总结] 用户取消`);
-                                            }
-                                        });
-                                    } else {
-                                        if (window.Gaigai.isBigSummaryRunning || (window.Gaigai.pendingBigSummaryEnd || 0) > lastIndex) {
-                                            console.log('⏸️ [自动总结] 执行前检测到大总结占用，取消本轮小总结');
-                                            return;
-                                        }
-                                        // 静默模式（勾选时）：直接执行
-                                        window.Gaigai.SummaryManager.callAIForSummary(
-                                            null,
-                                            targetEndIndex,
-                                            null,
-                                            C.autoSummarySilent,
-                                            false,
-                                            false,
-                                            C.autoSummaryTargetTables,  // 🆕 传入配置的表格范围
-                                            false,
-                                            true
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // ============================================================
-                    // 模块 C: 自动大总结
-                    // ============================================================
-                    if (autoBigSummaryTask) {
-                        if ($('.g-ov').length > 0) {
-                            console.log('⏸️ [自动大总结] 检测到插件弹窗打开，跳过本次触发');
-                            return;
-                        }
-
-                        const { lastBigIndex, currentCount, bigInterval, bigDelay, bigThreshold, targetEndIndex } = autoBigSummaryTask;
-                        console.log(`📚 [Auto Big Summary] 触发! 当前:${currentCount}, 上次:${lastBigIndex}, 间隔:${bigInterval}, 延迟:${bigDelay}, 阈值:${bigThreshold}, 目标:${targetEndIndex}`);
-
-                        if (window.Gaigai.SummaryManager && typeof window.Gaigai.SummaryManager.runBigSummary === 'function') {
-                            // 防重入：大总结执行期间，阻止同区间/后续消息重复触发
-                            if (window.Gaigai.isBigSummaryRunning) {
-                                console.log('⏳ [自动大总结] 上一轮任务仍在执行，跳过本次重复触发');
-                            } else {
-                                window.Gaigai.isBigSummaryRunning = true;
-                                window.Gaigai.pendingBigSummaryEnd = targetEndIndex;
-
-                                Promise.resolve(window.Gaigai.SummaryManager.runBigSummary(lastBigIndex, targetEndIndex))
-                                    .catch(err => {
-                                        console.error('❌ [自动大总结] 执行失败:', err);
-                                    })
-                                    .finally(() => {
-                                        window.Gaigai.isBigSummaryRunning = false;
-                                        window.Gaigai.pendingBigSummaryEnd = 0;
-                                    });
-                            }
-                        }
-                    }
-
-                    // ⚡ Optimization: Only scan DOM if Real-time is active OR if the text contains a tag
-                    // This reduces "Render Storm" conflicts when the plugin is supposed to be passive.
-                    const hasTag = mg.mes && (mg.mes.includes('Memory') || mg.mes.includes('tableEdit'));
-                    if (C.enabled || hasTag) {
-                        setTimeout(hideMemoryTags, 100);
-                    }
-
-                    // ✨✨✨【UI 自动刷新】✨✨✨
-                    // 如果表格窗口正开着，就刷新当前选中的那个表，让你立刻看到变化
-                    if ($('#gai-main-pop').length > 0) {
-                        const activeTab = $('.g-t.act').data('i');
-                        if (activeTab !== undefined) {
-                            refreshTable(activeTab);
-                            console.log(`🔄 [UI] 表格视图已自动刷新`);
-                        }
-                    }
-
-                } catch (e) {
-                    console.error('❌ omsg 执行错误:', e);
-                } finally {
-                    delete pendingTimers[msgKey];
-                }
-            }, 1000); // 延迟 1秒 (可根据流式传输速度调整为500-2000ms)
-
-        } catch (e) {
-            console.error('❌ omsg 错误:', e);
+        } catch (error) {
+            console.error('❌ [自动总结] 表格总结失败:', error);
+        } finally {
+            window.Gaigai.isTableSummaryRunning = false;
         }
     }
 
-    /**
-     * 自动追溯填表核心函数 (已修复：非静默模式下等待弹窗返回)
-     * @param {number} start - 起始楼层索引
-     * @param {number} end - 结束楼层索引
-     * @param {boolean} isManual - 是否为手动触发
-     */
-
-    // ✅✅✅ [修正版] 聊天切换/初始化函数
-    // ============================================================
-    // 1. 聊天状态变更监听 (修复删楼、分支切换、多重宇宙逻辑)
-    // ============================================================
     async function ochat() {
         // 🔒 性能优化：加锁，防止切换期间误操作
         isChatSwitching = true;
@@ -13110,11 +11263,6 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
         });
         processedMessageSignatures = {};
         console.log('🔒 [ochat] 会话切换锁已启用');
-
-        // ✨ [防串味] 重置世界书状态
-        if (window.Gaigai && window.Gaigai.WI && typeof window.Gaigai.WI.resetState === 'function') {
-            window.Gaigai.WI.resetState();
-        }
 
         // 🛡️🛡️🛡️ [防串味核心修复] 强制清空所有运行时状态
         // 不依赖 m.load() 内部判断，直接在入口处暴力重置
@@ -13291,9 +11439,9 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                     else if (currentLen > 1) {
                         console.log('🚑 [补丁B] 已有聊天记录但缺失第 0 楼快照，尝试补录');
 
-                        // 如果第 0 楼是 AI 发的，调用 omsg 处理
+                        // 轻量版不解析历史 AI 回复，只补建当前表格快照
                         if (firstMsg && firstMsg.is_user === false) {
-                            omsg(0);
+                            saveSnapshot('0');
                         }
                         // 如果第 0 楼是 User 发的，那么第 0 楼的基准应该是空表（-1）
                         else {
@@ -14124,7 +12272,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
             // 注意：向量检索已移至 Fetch Hijack 中处理，确保在发送请求前完成
 
             // 8. 注入 (此时表格已是回档后的干净状态)
-            inj(data);
+            injectSummaryFallback(data);
 
             // 探针
             window.Gaigai.lastRequestData = {
@@ -14164,6 +12312,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
             const savedConfig = localStorage.getItem(CK);
             if (savedConfig) {
                 Object.assign(C, JSON.parse(savedConfig));
+                sanitizeLeanConfig();
                 console.log('✅ [初始化] 已从 localStorage 加载用户配置');
             }
         } catch (e) {
@@ -14356,8 +12505,10 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
         const x = m.ctx();
         if (x && x.eventSource) {
             try {
-                // 监听AI消息生成完成事件（用于解析Memory标签）
-                x.eventSource.on(x.event_types.CHARACTER_MESSAGE_RENDERED, function (id) { omsg(id); });
+                // 监听AI消息生成完成事件（仅用于检查自动表格总结）
+                x.eventSource.on(x.event_types.CHARACTER_MESSAGE_RENDERED, function () {
+                    handleAutoTableSummary();
+                });
 
                 // 🆕 监听AI消息生成完成事件（用于自动隐藏楼层）
                 // 🔥 防抖机制：避免短时间内重复触发
@@ -14790,7 +12941,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                     // 如果是切回旧分支(Swap)，这里会读到旧分支的内容并恢复表格。
                     setTimeout(() => {
                         console.log(`▶️ [Swipe] 重新计算当前分支内容...`);
-                        omsg(id);
+                        console.log('ℹ️ [Swipe] 轻量版不解析回复中的填表标签');
                     }, 200); // 给 200ms 缓冲，确保 DOM 已经切换完成
 
                     console.log(`✅ [Swipe] 回滚流程执行完毕，等待新生成...`);
@@ -14894,218 +13045,59 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
 
     // 🔧 自动获取 index.js 所在的目录路径（终极动态版）
     function getExtensionPath() {
+        const currentSrc = document.currentScript && document.currentScript.getAttribute('src');
+        if (currentSrc && /\/index\.js(?:[?#].*)?$/i.test(currentSrc)) {
+            return currentSrc.replace(/\/index\.js(?:[?#].*)?$/i, '');
+        }
         // 遍历脚本标签定位插件路径
         const scripts = document.getElementsByTagName('script');
         for (let i = 0; i < scripts.length; i++) {
             const src = scripts[i].getAttribute('src');
             if (!src) continue;
 
-            // 只要路径包含插件文件夹名，就认为是它
-            if (src.includes('ST-Memory-Context/index.js')) {
-                return src.replace(/\/index\.js$/i, '').replace(/\\index\.js$/i, '');
+            // 兼容原目录名、下载压缩包的 -main 后缀以及本地重命名目录。
+            if (/ST-Memory-Context(?:-main)?\/index\.js(?:[?#].*)?$/i.test(src)) {
+                return src.replace(/\/index\.js(?:[?#].*)?$/i, '');
             }
         }
 
-        console.error('❌ [Gaigai] 无法定位插件路径，依赖加载将失败！请检查文件夹名称是否为 ST-Memory-Context');
+        console.error('❌ [Gaigai] 无法定位插件路径，依赖加载将失败！');
         return '';
     }
 
     const EXTENSION_PATH = getExtensionPath();
     console.log('📍 [Gaigai] 动态定位插件路径:', EXTENSION_PATH);
 
-    function loadDependencies() {
-        // 确保全局对象存在
-        window.Gaigai = window.Gaigai || {};
+    // 轻量版加载链：不再加载实时/批量填表、世界书同步或手机填表适配模块。
+    function loadLeanDependencies() {
+        const modules = [
+            { file: 'debug_manager.js', optional: true },
+            { file: 'prompt_manager.js', optional: false },
+            { file: 'backfill_manager.js', optional: false },
+            { file: 'io_manager.js', optional: true },
+            { file: 'summary_manager.js', optional: false },
+            { file: 'vector_manager.js', optional: false }
+        ];
 
-        // 🚀 [优先级1] 最先加载 debug_manager.js，确保能捕获后续模块的所有错误
-        const debugManagerUrl = `${EXTENSION_PATH}/debug_manager.js`;
-        $.getScript(debugManagerUrl)
-            .done(function () {
-                console.log('✅ [Loader] debug_manager.js 加载成功 (优先加载)');
+        const loadNext = index => {
+            if (index >= modules.length) {
+                setTimeout(tryInit, 500);
+                return;
+            }
+            const module = modules[index];
+            const url = `${EXTENSION_PATH}/${module.file}`;
+            $.getScript(url)
+                .done(() => {
+                    console.log(`✅ [Loader] ${module.file} 加载成功`);
+                    loadNext(index + 1);
+                })
+                .fail((_jqxhr, _settings, error) => {
+                    console.error(`❌ [Loader] ${module.file} 加载失败:`, error);
+                    if (module.optional) loadNext(index + 1);
+                });
+        };
 
-                // 🚀 [优先级2] 调试模块就绪后，开始加载业务模块
-                // 动态加载内置方案数据包（可选）+ prompt_manager.js
-                const promptBundleUrl = `${EXTENSION_PATH}/builtin_preset_bundle.js`;
-                const promptManagerUrl = `${EXTENSION_PATH}/prompt_manager.js`;
-
-                const loadPromptManager = function () {
-                    $.getScript(promptManagerUrl)
-                        .done(function () {
-                            console.log('✅ [Loader] prompt_manager.js 加载成功');
-
-                            // 🆕 加载 io_manager.js
-                            const ioManagerUrl = `${EXTENSION_PATH}/io_manager.js`;
-                            $.getScript(ioManagerUrl)
-                                .done(function () {
-                                    console.log('✅ [Loader] io_manager.js 加载成功');
-
-                                // 🆕 加载 backfill_manager.js
-                                const backfillManagerUrl = `${EXTENSION_PATH}/backfill_manager.js`;
-                                $.getScript(backfillManagerUrl)
-                                    .done(function () {
-                                        console.log('✅ [Loader] backfill_manager.js 加载成功');
-
-                                        // 🆕 加载 world_info.js (必须在 summary_manager 之前加载)
-                                        const worldInfoUrl = `${EXTENSION_PATH}/world_info.js`;
-                                        $.getScript(worldInfoUrl)
-                                            .done(function () {
-                                                console.log('✅ [Loader] world_info.js 加载成功');
-
-                                                // 🆕 加载 summary_manager.js
-                                                const summaryManagerUrl = `${EXTENSION_PATH}/summary_manager.js`;
-                                                $.getScript(summaryManagerUrl)
-                                                    .done(function () {
-                                                        console.log('✅ [Loader] summary_manager.js 加载成功');
-
-                                                        // 🆕 加载 vector_manager.js
-                                                        const vectorManagerUrl = `${EXTENSION_PATH}/vector_manager.js`;
-                                                        $.getScript(vectorManagerUrl)
-                                                            .done(function () {
-                                                                console.log('✅ [Loader] vector_manager.js 加载成功');
-
-                                                                // ✨ 验证模块是否成功挂载
-                                                                if (!window.Gaigai.DebugManager) {
-                                                                    console.error('⚠️ [Loader] window.Gaigai.DebugManager 未成功挂载！');
-                                                                    console.error(`📍 尝试加载的 URL: ${debugManagerUrl}`);
-                                                                }
-                                                                if (!window.Gaigai.IOManager) {
-                                                                    console.error('⚠️ [Loader] window.Gaigai.IOManager 未成功挂载！');
-                                                                    console.error(`📍 尝试加载的 URL: ${ioManagerUrl}`);
-                                                                }
-                                                                if (!window.Gaigai.SummaryManager) {
-                                                                    console.error('⚠️ [Loader] window.Gaigai.SummaryManager 未成功挂载！');
-                                                                    console.error(`📍 尝试加载的 URL: ${summaryManagerUrl}`);
-                                                                }
-                                                                if (!window.Gaigai.BackfillManager) {
-                                                                    console.error('⚠️ [Loader] window.Gaigai.BackfillManager 未成功挂载！');
-                                                                    console.error(`📍 尝试加载的 URL: ${backfillManagerUrl}`);
-                                                                }
-                                                                if (!window.Gaigai.WI) {
-                                                                    console.error('⚠️ [Loader] window.Gaigai.WI 未成功挂载！');
-                                                                    console.error(`📍 尝试加载的 URL: ${worldInfoUrl}`);
-                                                                }
-                                                                if (!window.Gaigai.VM) {
-                                                                    console.error('⚠️ [Loader] window.Gaigai.VM 未成功挂载！');
-                                                                    console.error(`📍 尝试加载的 URL: ${vectorManagerUrl}`);
-                                                                }
-
-                                                                // 📱 加载手机插件适配模块
-                                                                const phoneAdapterUrl = `${EXTENSION_PATH}/phone-adapter.js`;
-                                                                $.getScript(phoneAdapterUrl)
-                                                                    .done(function () {
-                                                                        console.log('✅ [Loader] phone-adapter.js 加载成功');
-                                                                        // 所有依赖加载完后，再启动主初始化流程
-                                                                        setTimeout(tryInit, 500);
-                                                                    })
-                                                                    .fail(function () {
-                                                                        console.warn('⚠️ [Loader] phone-adapter.js 加载失败（可选模块，继续初始化）');
-                                                                        // 即使加载失败，也继续初始化
-                                                                        setTimeout(tryInit, 500);
-                                                                    });
-                                                            })
-                                                            .fail(function (jqxhr, settings, exception) {
-                                                                console.error('❌ [Loader] vector_manager.js 加载失败！');
-                                                                console.error(`📍 尝试加载的 URL: ${vectorManagerUrl}`);
-                                                                console.error(`📍 HTTP 状态码: ${jqxhr.status}`);
-                                                                console.error(`📍 错误详情:`, exception);
-                                                                console.error(`💡 提示：请检查文件是否存在，或控制台 Network 面板查看具体错误`);
-                                                                // 即使加载失败，也继续初始化（降级模式）
-                                                                setTimeout(tryInit, 500);
-                                                            });
-                                                    })
-                                                    .fail(function (jqxhr, settings, exception) {
-                                                        console.error('❌ [Loader] summary_manager.js 加载失败！');
-                                                        console.error(`📍 尝试加载的 URL: ${summaryManagerUrl}`);
-                                                        console.error(`📍 HTTP 状态码: ${jqxhr.status}`);
-                                                        console.error(`📍 错误详情:`, exception);
-                                                        console.error(`💡 提示：请检查文件是否存在，或控制台 Network 面板查看具体错误`);
-                                                        // 即使加载失败，也继续初始化（降级模式）
-                                                        setTimeout(tryInit, 500);
-                                                    });
-                                            })
-                                            .fail(function (jqxhr, settings, exception) {
-                                                console.error('❌ [Loader] world_info.js 加载失败！');
-                                                console.error(`📍 尝试加载的 URL: ${worldInfoUrl}`);
-                                                console.error(`📍 HTTP 状态码: ${jqxhr.status}`);
-                                                console.error(`📍 错误详情:`, exception);
-                                                console.error(`💡 提示：请检查文件是否存在，或控制台 Network 面板查看具体错误`);
-                                                // 即使加载失败，也继续初始化（降级模式）
-                                                setTimeout(tryInit, 500);
-                                            });
-                                    })
-                                    .fail(function (jqxhr, settings, exception) {
-                                        console.error('❌ [Loader] backfill_manager.js 加载失败！');
-                                        console.error(`📍 尝试加载的 URL: ${backfillManagerUrl}`);
-                                        console.error(`📍 HTTP 状态码: ${jqxhr.status}`);
-                                        console.error(`📍 错误详情:`, exception);
-                                        console.error(`💡 提示：请检查文件是否存在，或控制台 Network 面板查看具体错误`);
-                                        // 即使加载失败，也继续初始化（降级模式）
-                                        setTimeout(tryInit, 500);
-                                    });
-                            })
-                            .fail(function (jqxhr, settings, exception) {
-                                console.error('❌ [Loader] io_manager.js 加载失败！');
-                                console.error(`📍 尝试加载的 URL: ${ioManagerUrl}`);
-                                console.error(`📍 HTTP 状态码: ${jqxhr.status}`);
-                                console.error(`📍 错误详情:`, exception);
-                                console.error(`💡 提示：请检查文件是否存在，或控制台 Network 面板查看具体错误`);
-                                // 即使加载失败，也继续初始化（降级模式）
-                                setTimeout(tryInit, 500);
-                                });
-                        })
-                        .fail(function (jqxhr, settings, exception) {
-                            console.error('❌ [Loader] prompt_manager.js 加载失败！请检查文件夹名称是否为 ST-Memory-Context');
-                            console.error(`📍 尝试加载的 URL: ${promptManagerUrl}`);
-                            console.error(`📍 HTTP 状态码: ${jqxhr.status}`);
-                            console.error(`📍 错误详情:`, exception);
-                            console.error(`💡 提示：请检查 EXTENSION_PATH 是否正确，当前值为: ${EXTENSION_PATH}`);
-                            // 即使加载失败，也继续初始化（降级模式）
-                            setTimeout(tryInit, 500);
-                        });
-                };
-
-                $.getScript(promptBundleUrl)
-                    .done(function () {
-                        console.log('✅ [Loader] builtin_preset_bundle.js 加载成功');
-                        loadPromptManager();
-                    })
-                    .fail(function () {
-                        console.warn('⚠️ [Loader] builtin_preset_bundle.js 加载失败，回退到 prompt_manager 内置默认常量');
-                        loadPromptManager();
-                    });
-            })
-            .fail(function (jqxhr, settings, exception) {
-                console.error('❌ [Loader] debug_manager.js 加载失败！但尝试继续加载其他模块');
-                console.error(`📍 尝试加载的 URL: ${debugManagerUrl}`);
-                console.error(`📍 HTTP 状态码: ${jqxhr.status}`);
-                console.error(`📍 错误详情:`, exception);
-                console.error(`💡 提示：调试模块加载失败，将无法捕获后续错误日志`);
-
-                // 即使调试模块失败，也尝试加载业务模块（降级模式）
-                const promptBundleUrl = `${EXTENSION_PATH}/builtin_preset_bundle.js`;
-                const promptManagerUrl = `${EXTENSION_PATH}/prompt_manager.js`;
-                const loadPromptManagerFallback = function () {
-                    $.getScript(promptManagerUrl)
-                        .done(function () {
-                            console.log('✅ [Loader] prompt_manager.js 加载成功 (降级模式)');
-                            // 继续加载其他模块...
-                            setTimeout(tryInit, 500);
-                        })
-                        .fail(function () {
-                            console.error('❌ [Loader] 严重错误：核心模块加载失败，插件无法启动');
-                        });
-                };
-
-                $.getScript(promptBundleUrl)
-                    .done(function () {
-                        console.log('✅ [Loader] builtin_preset_bundle.js 加载成功 (降级模式)');
-                        loadPromptManagerFallback();
-                    })
-                    .fail(function () {
-                        console.warn('⚠️ [Loader] builtin_preset_bundle.js 加载失败 (降级模式)，回退到内置常量');
-                        loadPromptManagerFallback();
-                    });
-            });
+        loadNext(0);
     }
 
     // ✅✅✅ 直接把核心变量挂到 window.Gaigai 上 (使用 Object.assign 防止覆盖子模块)
@@ -15132,8 +13124,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
         updateCurrentSnapshot: updateCurrentSnapshot,  // ✅ 子模块需要
         refreshTable: refreshTable,  // ✅ 子模块需要
         updateTabCount: updateTabCount,  // ✅ 子模块需要
-        syncToWorldInfo: (...args) => window.Gaigai.WI.syncToWorldInfo(...args),  // ✅ 总结模块需要同步到世界书（兼容性包装）
-        getCsrfToken: getCsrfToken,  // ✅ WI 模块需要
+        getCsrfToken: getCsrfToken,
         customRetryAlert: customRetryAlert,  // ✅ 重试弹窗
         DEFAULT_TABLES: DEFAULT_TABLES  // ✅ 单一数据源：默认表格结构（供 prompt_manager.js 等子模块使用）
     });
@@ -15191,7 +13182,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
     console.log('✅ [核心工具] 已公开给子模块使用（命名空间隔离）');
 
     // 启动加载器（在 window.Gaigai 完全初始化之后）
-    loadDependencies();
+    loadLeanDependencies();
 
 
     // ✨✨✨ 重写：关于页 & 更新检查 & 首次弹窗 (颜色修复版) ✨✨✨
@@ -15224,7 +13215,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                     </span>
                 </div>
                 <div id="update-status" style="background:rgba(0,0,0,0.05); padding:6px; border-radius:4px; font-size:11px; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--g-tc);">
-                    ⏳ 正在连接 GitHub 检查更新...
+                    🔒 LEASE 本地魔改版不连接上游自动更新
                 </div>
             </div>
 
@@ -15236,7 +13227,8 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                         📢 本次更新内容 (v${cleanVer})
                     </h4>
                     <ul style="margin:0; padding-left:20px; font-size:12px; color:var(--g-tc); opacity:0.9;">
-                        <li><strong>优化默认设置：</strong>自动总结的初始来源改为“聊天历史”，更适合多数用户的默认使用场景。</li>
+                        <li><strong>轻量化重构：</strong>保留记忆表格、完整手动追溯、表格总结、默认总结注入与独立向量检索。</li>
+                        <li><strong>统一切片：</strong>总结正文按 <code>===</code> 拆分后逐片生成向量，不写入总结行标题或备注。</li>
                     </ul>
                 </div>
 
@@ -15248,19 +13240,15 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
 
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
                         <div style="background:rgba(255,255,255,0.3); padding:10px; border-radius:6px; border:1px solid rgba(0,0,0,0.05);">
-                            <div style="font-weight:bold; margin-bottom:4px; color:var(--g-tc); font-size:12px;">📊 填表模式 (二选一)</div>
+                            <div style="font-weight:bold; margin-bottom:4px; color:var(--g-tc); font-size:12px;">📊 记忆表格</div>
                             <div style="font-size:11px; color:var(--g-tc); opacity:0.8;">
-                                • <strong>实时填表：</strong> 每次回复都写。优点是实时性强。<br>
-                                • <strong>批量填表：</strong> 每N楼写一次。优点是省Token。<br>
-                                <span style="opacity:0.6; font-size:10px;">(推荐开启批量填表 + 独立API)</span>
+                                手动维护主线、支线、人物、设定、物品与约定等结构化记忆；插件不再要求模型在正文末尾实时填表。
                             </div>
                         </div>
                         <div style="background:rgba(255,255,255,0.3); padding:10px; border-radius:6px; border:1px solid rgba(0,0,0,0.05);">
-                            <div style="font-weight:bold; margin-bottom:4px; color:var(--g-tc); font-size:12px;">📝 总结模式</div>
+                            <div style="font-weight:bold; margin-bottom:4px; color:var(--g-tc); font-size:12px;">📝 总结与向量</div>
                             <div style="font-size:11px; color:var(--g-tc); opacity:0.8;">
-                                • <strong>表格源：</strong> 依据表格里的填表数据生成总结。<br>
-                                • <strong>聊天源：</strong> 依据聊天历史楼层生成总结。<br>
-                                <span style="opacity:0.6; font-size:10px;">(可在配置中切换总结来源)</span>
+                                选择具体记忆表格生成总结；成功后可保留、隐藏或删除源行，并可自动按分隔符切片向量化。
                             </div>
                         </div>
                     </div>
@@ -15268,18 +13256,13 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                     <div style="background:rgba(76, 175, 80, 0.1); border:1px solid rgba(76, 175, 80, 0.3); padding:10px; border-radius:6px;">
                         <div style="font-weight:bold; color:#2e7d32; margin-bottom:4px; font-size:12px;">💡 新手/旧卡 推荐流程</div>
                         <ol style="margin:0; padding-left:15px; font-size:11px; color:#2e7d32;">
-                            <li>点击 <strong>【⚡ 追溯】</strong> 按钮，进行一次全量或分批填表，补全历史数据。</li>
-                            <li>前往 <strong>【⚙️ 配置】</strong>，开启 <strong>[批量填表]</strong> 和 <strong>[自动总结]</strong>。</li>
-                            <li>享受全自动托管，AI 会自动维护记忆。</li>
+                            <li>旧聊天先打开 <strong>【追溯】</strong>，按区间补填或重构记忆表格；新内容也可手动维护。</li>
+                            <li>打开 <strong>【总结】</strong>，选择表格与总结后的源行处理方式。</li>
+                            <li>在 <strong>【向量化总结】</strong> 中配置 Embedding API，并开启总结后自动向量化。</li>
                         </ol>
                     </div>
                 </div>
 
-                <div style="margin-top:15px; font-size:11px; text-align:center; opacity:0.7;">
-                    <a href="${repoUrl}" target="_blank" style="text-decoration:none; color:var(--g-tc); border-bottom:1px dashed var(--g-tc);">
-                       🔗 GitHub 项目主页
-                    </a>
-                </div>
             </div>
 
             <div style="padding-top:5px; border-top:1px solid rgba(255,255,255,0.2); text-align:right; flex-shrink:0;">
@@ -15317,9 +13300,7 @@ updateRow(1, 0, {4: "王五销毁了图纸..."})
                 const ctx = m.ctx();
                 const currentFloorCount = (ctx && Array.isArray(ctx.chat)) ? ctx.chat.length : 0;
                 const summaryPointer = API_CONFIG.lastSummaryIndex || 0;
-                const backfillPointer = API_CONFIG.lastBackfillIndex || 0;
                 const summaryProgress = Math.min(summaryPointer, currentFloorCount);
-                const backfillProgress = Math.min(backfillPointer, currentFloorCount);
                 const providerKey = String(API_CONFIG.provider || '');
                 const providerNameMap = {
                     proxy_only: 'OpenAI 兼容模式/反代(如build)',
@@ -15386,30 +13367,20 @@ API模式: ${API_CONFIG.useIndependentAPI ? '独立API (' + providerDisplayName 
 【进度状态】
 当前楼层数: ${currentFloorCount}
 总结指针: ${summaryPointer}
-填表指针: ${backfillPointer}
 总结进度: ${summaryProgress}/${currentFloorCount}
-填表进度: ${backfillProgress}/${currentFloorCount}
 提示词方案: ${currentPromptProfileName}
 表格结构方案: ${currentTablePresetName}
 
-【填表设置】
-实时填表: ${C.enabled ? '开启' : '关闭'}
-批量填表: ${C.autoBackfill ? '开启 (每' + C.autoBackfillFloor + '层触发)' : '关闭'}
-注入表格: ${C.tableInj ? '开启' : '关闭'}
-隐藏楼层: ${C.contextLimit ? '开启 (留' + C.contextLimitCount + '层)' : '关闭'}
-
 【总结设置】
 自动总结: ${C.autoSummary ? '开启 (每' + C.autoSummaryFloor + '层触发)' : '关闭'}
-总结来源: ${API_CONFIG.summarySource === 'table' ? '仅表格' : '聊天历史'}
-大总结: ${C.autoBigSummary ? '开启 (每' + C.autoBigSummaryFloor + '层触发)' : '关闭'}
-总结后隐藏: ${C.autoSummaryHideContext ? '开启' : '关闭'}
+总结来源: 记忆表格
+源行处理: ${C.summaryRowAction || 'hide'}
 
 【标签过滤】
 黑名单(去除): ${C.filterTags ? C.filterTags : '未设置'}
 白名单(仅留): ${C.filterTagsWhite ? C.filterTagsWhite : '未设置'}
 
-【外部联动】
-世界书同步: ${C.syncWorldInfo ? '开启' : '关闭'}
+【向量检索】
 独立向量化: ${C.vectorEnabled ? '开启' : '关闭'} (总结后自动: ${C.autoVectorizeSummary ? '开启' : '关闭'})
 ====================================
 `.trim();
@@ -15451,6 +13422,12 @@ API模式: ${API_CONFIG.useIndependentAPI ? '独立API (' + providerDisplayName 
         // 1. 获取UI元素
         const $status = $('#update-status'); // 说明页里的状态文字
         const $icon = $('#gai-about-btn');     // 标题栏的图标
+
+        if (!REPO_PATH) {
+            $icon.removeClass('g-has-update').attr('title', '关于 LEASE Memory Context');
+            if ($status.length > 0) $status.text('🔒 LEASE 本地魔改版不连接上游自动更新');
+            return;
+        }
 
         try {
             // 2. 从 GitHub Raw 读取 main 分支的 index.js
@@ -15511,6 +13488,3 @@ API模式: ${API_CONFIG.useIndependentAPI ? '独立API (' + providerDisplayName 
     }
 
 })();
-
-
-

@@ -432,6 +432,31 @@
         }
 
         /**
+         * ✂️ 使用统一规则切分向量文本
+         * 总结表同步、文件导入和源文本编辑必须共享同一套切片行为。
+         * @private
+         * @param {string} text - 待切分文本
+         * @param {string} separator - 用户配置的分隔符
+         * @returns {string[]} - 已去除空白片段的文本数组
+         */
+        _splitTextIntoChunks(text, separator = '===') {
+            const content = this._resolvePlaceholders(String(text || ''));
+            const resolvedSeparator = separator || '===';
+
+            if (resolvedSeparator === '\\n' || resolvedSeparator === '\n') {
+                return content
+                    .split('\n')
+                    .map(chunk => chunk.trim())
+                    .filter(Boolean);
+            }
+
+            return content
+                .split(resolvedSeparator)
+                .map(chunk => chunk.trim())
+                .filter(Boolean);
+        }
+
+        /**
          * 🧮 计算文本的简单 hash（用于缓存）
          * @private
          */
@@ -768,19 +793,11 @@
                     reader.readAsText(file, 'UTF-8');
                 });
 
-                // ✅ 变量替换：将 {{user}} 和 {{char}} 替换为实际名字
-                content = this._resolvePlaceholders(content);
-
                 const config = this._getConfig();
                 const separator = config.separator || '===';
 
-                // 切分文本
-                let chunks = [];
-                if (separator === '\\n' || separator === '\n') {
-                    chunks = content.split('\n').filter(line => line.trim());
-                } else {
-                    chunks = content.split(separator).filter(chunk => chunk.trim());
-                }
+                // 使用与总结表同步、源文本编辑一致的规则切分文本
+                const chunks = this._splitTextIntoChunks(content, separator);
 
                 console.log(`📂 [VectorManager] 文件已切分为 ${chunks.length} 个片段`);
 
@@ -790,7 +807,7 @@
                 // 创建书籍对象
                 this.library[bookId] = {
                     name: customName || file.name,
-                    chunks: chunks.map(chunk => chunk.trim()),
+                    chunks,
                     vectors: new Array(chunks.length).fill(null),
                     vectorized: new Array(chunks.length).fill(false),
                     createTime: Date.now()
@@ -913,7 +930,7 @@
 
             console.log(`✅ [VectorManager] 书籍向量化完成: ${successCount} 成功, ${errorCount} 失败`);
 
-            return { success: true, count: successCount, errors: errorCount, lastError: lastErrorMessage };
+            return { success: errorCount === 0, count: successCount, errors: errorCount, lastError: lastErrorMessage };
         }
 
         /**
@@ -1115,19 +1132,14 @@
                 if (!summarySheet || !summarySheet.r) throw new Error('总结表无效');
 
                 // 1. 构建新的 chunks
+                // 只向量化总结正文，不混入“剧情总结 N”等行标题或备注。
+                // 每一行正文继续按用户配置的分隔符切分，默认分隔符为 ===。
                 const newChunks = [];
+                const separator = this._getConfig().separator || '===';
                 for (const row of summarySheet.r) {
                     const rowData = Array.isArray(row) ? row : Object.values(row);
-                    const title = rowData[0] || '';
                     const content = rowData[1] || '';
-                    const remark = rowData[2] || '';
-
-                    let chunkText = '';
-                    if (title) chunkText += title + (remark ? ` (${remark})` : '') + '\n';
-                    if (content) chunkText += content;
-
-                    chunkText = this._resolvePlaceholders(chunkText);
-                    if (chunkText.trim()) newChunks.push(chunkText.trim());
+                    newChunks.push(...this._splitTextIntoChunks(content, separator));
                 }
 
                 if (newChunks.length === 0) throw new Error('总结表内容为空');
@@ -1202,7 +1214,17 @@
                     if (needsUpdate) {
                         console.log('⚡ [VectorManager] 检测到新内容，开始增量向量化...');
                         const vectorizeResult = await this.vectorizeBook(bookId);
-                        return { success: true, count: newChunks.length, vectorized: true, vectorizeResult };
+                        if ((vectorizeResult?.errors || 0) > 0) {
+                            return {
+                                success: false,
+                                count: newChunks.length,
+                                bookId,
+                                vectorized: false,
+                                vectorizeResult,
+                                error: vectorizeResult.lastError || `${vectorizeResult.errors} 个片段向量化失败`
+                            };
+                        }
+                        return { success: true, count: newChunks.length, bookId, vectorized: true, vectorizeResult };
                     } else {
                         console.log('✅ [VectorManager] 所有内容命中缓存，无需调用 API');
                     }
@@ -3165,19 +3187,11 @@
 
                     if (newText === null) return; // 用户取消
 
-                    // ✅ 变量替换：将 {{user}} 和 {{char}} 替换为实际名字
-                    const processedText = self._resolvePlaceholders(newText);
-
-                    // 重新切分文本
-                    let newChunks = [];
-                    if (separator === '\\n' || separator === '\n') {
-                        newChunks = processedText.split('\n').filter(line => line.trim());
-                    } else {
-                        newChunks = processedText.split(separator).filter(chunk => chunk.trim());
-                    }
+                    // 使用与总结表同步、文件导入一致的规则重新切分文本
+                    const newChunks = self._splitTextIntoChunks(newText, separator);
 
                     // 更新书籍数据
-                    book.chunks = newChunks.map(chunk => chunk.trim());
+                    book.chunks = newChunks;
                     book.vectors = new Array(newChunks.length).fill(null);
                     book.vectorized = new Array(newChunks.length).fill(false);
 
