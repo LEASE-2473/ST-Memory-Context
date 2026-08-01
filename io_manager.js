@@ -124,7 +124,8 @@
             const result = {
                 v: window.Gaigai.V || 'v1.0.0',
                 t: new Date().toISOString(),
-                s: []
+                s: [],
+                summarized: {}
             };
 
             // 状态变量
@@ -199,7 +200,15 @@
                     const rowMatch = line.match(/^\s*\[(\d+)\]\s*(.+)$/);
                     if (rowMatch) {
                         const rowIndex = parseInt(rowMatch[1]);
-                        const rowContent = rowMatch[2];
+                        let rowContent = rowMatch[2];
+                        const isArchived = /^\[已归档\]\s*/.test(rowContent);
+                        if (isArchived) {
+                            rowContent = rowContent.replace(/^\[已归档\]\s*/, '');
+                            if (!Array.isArray(result.summarized[currentTableIndex])) {
+                                result.summarized[currentTableIndex] = [];
+                            }
+                            result.summarized[currentTableIndex].push(rowIndex);
+                        }
 
                         // 解析键值对
                         const pairs = rowContent.split('|').map(p => p.trim());
