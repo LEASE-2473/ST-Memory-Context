@@ -1,5 +1,5 @@
 ﻿// ========================================================================
-// LEASE Memory Context v3.3.1
+// LEASE Memory Context v3.3.2
 // SillyTavern 记忆管理系统 - 提供表格化记忆、表格总结与独立向量检索
 // ========================================================================
 (function () {
@@ -16,7 +16,7 @@
     }
     window.GaigaiLoaded = true;
 
-    console.log('🚀 LEASE Memory Context v3.3.1 启动');
+    console.log('🚀 LEASE Memory Context v3.3.2 启动');
 
     // ===== 防止配置被后台同步覆盖的标志 =====
     window.isEditingConfig = false;
@@ -25,7 +25,7 @@
     let isRestoringSettings = false;
 
     // ==================== 全局常量定义 ====================
-    const V = 'v3.3.1';
+    const V = 'v3.3.2';
     const SK = 'gg_data';              // 数据存储键
     const UK = 'gg_ui';                // UI配置存储键
     const AK = 'gg_api';               // API配置存储键

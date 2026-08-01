@@ -444,7 +444,7 @@
             let note = '';
             let finalAction = normalizedAction;
             if (!isSilent) {
-                const preview = await this.showSummaryPreview(summary, normalizedAction);
+                const preview = await this.showSummaryPreview(summary);
                 if (!preview) {
                     window.isSummarizing = false;
                     return { success: false, error: '用户取消保存' };
@@ -466,10 +466,12 @@
                 }
                 finalSummary = preview.summary;
                 note = preview.note;
-                finalAction = preview.rowAction;
             }
 
             m.sm.save(finalSummary, note);
+            if (!isSilent) {
+                finalAction = await this.showSourceRowActionDialog(normalizedAction);
+            }
             await applySourceRowAction(sources, finalAction);
             persistSummaryState();
 
@@ -488,45 +490,154 @@
             return { success: true, summary: finalSummary, rowAction: finalAction };
         }
 
-        showSummaryPreview(summaryText, defaultAction = 'hide') {
+        showSummaryPreview(summaryText) {
             return new Promise(resolve => {
                 const UI = window.Gaigai.ui;
-                const overlay = $('<div id="gg-summary-preview"></div>').css({
-                    position: 'fixed', inset: 0, zIndex: 10000030,
-                    background: 'rgba(0,0,0,.65)', display: 'flex',
-                    alignItems: 'center', justifyContent: 'center', padding: '16px'
+                const m = window.Gaigai.m;
+                const initialSessionId = m.gid();
+                const content = `
+                    <div class="g-p" style="display:flex;flex-direction:column;height:100%;min-height:0;">
+                        <h4 style="margin:0 0 8px 0;">📝 记忆总结预览</h4>
+                        <p style="opacity:.8;font-size:11px;margin:0 0 10px 0;flex-shrink:0;">
+                            ✅ 已生成总结建议<br>
+                            💡 您可以直接编辑润色内容，满意后点击保存
+                        </p>
+                        <textarea id="gg_summary_editor" style="flex:1;width:100%;min-height:0;padding:10px;border-radius:4px;font-size:12px;font-family:inherit;resize:none;line-height:1.8;margin-bottom:10px;">${window.Gaigai.esc(summaryText)}</textarea>
+                        <div style="margin-bottom:10px;flex-shrink:0;">
+                            <label for="gg_summary_note" style="display:block;font-size:12px;opacity:.8;margin-bottom:4px;">📌 备注：</label>
+                            <input type="text" id="gg_summary_note" placeholder="可选，不进入向量" style="width:100%;padding:8px;border-radius:4px;font-size:12px;">
+                        </div>
+                        <div style="display:flex;gap:10px;flex-shrink:0;">
+                            <button id="gg_cancel_summary" style="padding:8px 16px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;flex:1;">🚫 放弃</button>
+                            <button id="gg_regen_summary" style="padding:8px 16px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;flex:1;">🔄 重新生成</button>
+                            <button id="gg_save_summary" style="padding:8px 16px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;flex:2;font-weight:bold;">✅ 保存总结</button>
+                        </div>
+                    </div>`;
+
+                $('#gai-summary-pop').remove();
+                const overlay = $('<div>', { id: 'gai-summary-pop', class: 'g-ov', css: { zIndex: 10000010 } });
+                const panel = $('<div>', {
+                    class: 'g-w',
+                    css: { width: '700px', maxWidth: '92vw', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }
                 });
-                const box = $('<div></div>').css({
-                    width: 'min(760px, 94vw)', maxHeight: '88vh', overflow: 'auto',
-                    background: UI.c, color: UI.tc, borderRadius: '8px', padding: '16px'
+                const header = $('<div>', { class: 'g-hd', css: { flexShrink: 0 } });
+                header.append(`<h3 style="color:${UI.tc};flex:1;">📝 记忆总结</h3>`);
+                const close = $('<button>', {
+                    class: 'g-x', text: '×',
+                    css: { background: 'none', border: 'none', color: UI.tc, cursor: 'pointer', fontSize: '22px' }
                 });
-                const textarea = $('<textarea></textarea>').val(summaryText).css({
-                    width: '100%', minHeight: '360px', boxSizing: 'border-box',
-                    padding: '10px', resize: 'vertical', fontFamily: 'inherit'
+                const body = $('<div>', {
+                    class: 'g-bd', html: content,
+                    css: { flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '10px' }
                 });
-                const note = $('<input type="text" placeholder="备注（可选，不进入向量）">').css({ width: '100%', boxSizing: 'border-box', padding: '8px', marginTop: '8px' });
-                const action = $(`
-                    <select style="width:100%;padding:8px;margin-top:8px;">
-                        <option value="keep">保留源行</option>
-                        <option value="hide">隐藏源行</option>
-                        <option value="delete">删除源行</option>
-                    </select>`).val(normalizeRowAction(defaultAction));
-                const buttons = $('<div></div>').css({ display: 'flex', gap: '8px', marginTop: '12px' });
-                const cancel = $('<button type="button">取消</button>').css({ flex: 1, padding: '9px' });
-                const regenerate = $('<button type="button">🔄 重新生成</button>').css({ flex: 1, padding: '9px', background: '#17a2b8', color: '#fff', border: 0, borderRadius: '4px' });
-                const save = $('<button type="button">保存总结</button>').css({ flex: 1, padding: '9px', background: '#4caf50', color: '#fff', border: 0, borderRadius: '4px' });
-                cancel.on('click', () => { overlay.remove(); resolve(null); });
-                regenerate.on('click', () => { overlay.remove(); resolve({ regenerate: true }); });
-                save.on('click', () => {
-                    const summary = String(textarea.val() || '').trim();
-                    if (!summary) return;
+
+                const cleanup = result => {
                     overlay.remove();
-                    resolve({ summary, note: String(note.val() || '').trim(), rowAction: normalizeRowAction(action.val()) });
+                    resolve(result);
+                };
+                close.on('click', () => cleanup(null));
+                header.append(close);
+                panel.append(header, body);
+                overlay.append(panel);
+                $('body').append(overlay);
+
+                $('#gg_cancel_summary').on('click', () => cleanup(null));
+                $('#gg_regen_summary').on('click', () => cleanup({ regenerate: true }));
+                $('#gg_save_summary').on('click', async () => {
+                    const summary = String($('#gg_summary_editor').val() || '').trim();
+                    if (!summary) {
+                        await window.Gaigai.customAlert('总结内容不能为空', '提示');
+                        return;
+                    }
+                    if (!initialSessionId || m.gid() !== initialSessionId) {
+                        await window.Gaigai.customAlert('检测到会话已经切换，已取消保存。请在当前会话重新执行总结。', '安全拦截');
+                        return;
+                    }
+                    cleanup({
+                        summary,
+                        note: String($('#gg_summary_note').val() || '').trim()
+                    });
                 });
-                buttons.append(cancel, regenerate, save);
-                box.append('<h3 style="margin:0 0 10px;">📝 检查总结</h3>', textarea, note, action, buttons);
+                setTimeout(() => $('#gg_summary_editor').trigger('focus'), 100);
+            });
+        }
+
+        showSourceRowActionDialog(defaultAction = 'hide') {
+            return new Promise(resolve => {
+                const UI = window.Gaigai.ui;
+                const isDark = !!UI.darkMode;
+                const textColor = UI.tc;
+                const dialogId = `summary-action-${Date.now()}`;
+                const overlay = $('<div>', {
+                    id: dialogId,
+                    css: {
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        width: '100vw', height: '100dvh',
+                        background: 'rgba(0,0,0,.6)', zIndex: 10000020,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: 'max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))'
+                    }
+                });
+                const box = $('<div>', {
+                    class: 'summary-action-box',
+                    css: {
+                        background: isDark ? '#1e1e1e' : '#fff', color: textColor,
+                        border: isDark ? '1px solid rgba(255,255,255,.1)' : 'none',
+                        borderRadius: '12px', padding: '24px',
+                        boxShadow: '0 10px 40px rgba(0,0,0,.4)',
+                        width: '90%', maxWidth: '420px', maxHeight: '100%', overflow: 'auto',
+                        display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'center'
+                    }
+                });
+                box.append('<div style="font-size:18px;margin-bottom:8px;color:var(--g-tc);">🎉 总结已保存！</div>');
+                box.append('<div style="font-size:13px;opacity:.8;margin-bottom:12px;color:var(--g-tc);">请选择如何处理<strong>原始表格数据</strong>：</div>');
+
+                const buttonContainer = $('<div>').css({ display: 'flex', gap: '10px', width: '100%', flexWrap: 'wrap' });
+                const buttonStyle = {
+                    flex: 1, minWidth: 0, padding: '12px 8px', borderRadius: '8px',
+                    cursor: 'pointer', fontSize: '13px', fontWeight: 'bold',
+                    transition: 'all .2s', textAlign: 'center', lineHeight: 1.4,
+                    border: 'none', outline: 'none'
+                };
+                const finish = action => {
+                    overlay.remove();
+                    resolve(normalizeRowAction(action));
+                };
+                const deleteButton = $('<button>', {
+                    class: 'summary-action-btn summary-action-delete',
+                    html: '🗑️ 删除源行<br><span style="font-size:10px;font-weight:normal;opacity:.8;color:inherit;">(从源表移除)</span>',
+                    css: {
+                        ...buttonStyle,
+                        background: isDark ? 'rgba(220,53,69,.2)' : 'rgba(220,53,69,.1)',
+                        color: textColor, border: `1px solid ${isDark ? '#ff6b6b' : '#dc3545'}`
+                    }
+                }).on('click', () => finish('delete'));
+                const hideButton = $('<button>', {
+                    class: 'summary-action-btn summary-action-hide',
+                    html: '🙈 仅隐藏<br><span style="font-size:10px;font-weight:normal;opacity:.8;color:inherit;">(标记已处理)</span>',
+                    css: {
+                        ...buttonStyle,
+                        background: isDark ? 'rgba(40,167,69,.2)' : 'rgba(40,167,69,.1)',
+                        color: textColor, border: `1px solid ${isDark ? '#51cf66' : '#28a745'}`
+                    }
+                }).on('click', () => finish('hide'));
+                const keepButton = $('<button>', {
+                    class: 'summary-action-btn summary-action-keep',
+                    html: '👁️ 保留<br><span style="font-size:10px;font-weight:normal;opacity:.8;color:inherit;">(不做修改)</span>',
+                    css: {
+                        ...buttonStyle,
+                        background: isDark ? 'rgba(108,117,125,.2)' : 'rgba(108,117,125,.1)',
+                        color: textColor, border: `1px solid ${isDark ? 'rgba(108,117,125,.5)' : '#6c757d'}`
+                    }
+                }).on('click', () => finish('keep'));
+
+                buttonContainer.append(deleteButton, hideButton, keepButton);
+                box.append(buttonContainer);
                 overlay.append(box);
                 $('body').append(overlay);
+
+                const preferred = normalizeRowAction(defaultAction);
+                box.find(`.summary-action-${preferred}`).trigger('focus');
             });
         }
     }

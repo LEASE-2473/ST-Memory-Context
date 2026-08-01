@@ -1,5 +1,23 @@
 # 更改日志
 
+## 2026-08-02 恢复上游总结预览窗并修复手机端溢出
+
+- **用户目标**：修复表格总结未静默保存时出现的预览窗在手机界面顶出屏幕的问题，不再使用 LEASE 重构时另写的弹窗，直接恢复上游 UI。
+- **主要修改**：将自定义 `#gg-summary-preview` 替换为上游 `#gai-summary-pop`、`.g-ov`、`.g-w`、`.g-hd`、`.g-bd`、`.g-p` 结构，移除手机端不适配的 `min-height: 360px` 文本框和整窗滚动方案，重新使用插件现有的 85dvh 限高、内部弹性布局与滚动规则；恢复上游在保存后显示的三按钮原行处理框（删除、隐藏、保留），删除行为按 LEASE 当前语义只作用于本次参与总结的源行；保留会话切换安全检查。确认静默参数为 `true` 时直接写入总结并按全局设置处理源行，不调用预览窗或原行处理框。版本升至 `3.3.2`。
+- **修改的文件**：`summary_manager.js`、`index.js`、`manifest.json`、`README.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`。未修改或同步 SillyTavern 本地运行目录。
+- **验证**：执行全部 JavaScript 语法检查、`manifest.json` 解析、静默/非静默总结分支行为测试、上游弹窗结构静态对照及 `git diff --check`。
+- **未完成事项**：尚未在手机 Safari/Chrome 的真实 SillyTavern 页面中调用模型并检查弹窗。
+- **已知风险与建议**：手机浏览器地址栏展开/收起会改变动态视口高度；当前布局沿用上游 85dvh 方案，部署后应在实际手机上分别验证横屏、竖屏和软键盘弹出状态。
+
+## 2026-08-02 固化 GitHub 发布安全边界与原作者创意署名
+
+- **用户目标**：为后续修改留下明确规则，绝不影响、打扰或向原作者 GitHub 仓库写入，同时清楚声明本版本魔改自原作者的创意与开源项目。
+- **主要修改**：新增 `GITHUB_PUBLISHING_SAFETY.md`，明确 LEASE 仓库是唯一允许写入的目标，原作者仓库仅可只读参考；禁止向原作者推送、创建 PR/Issue/评论/Release 或产生通知，并列出每次发布前的目标核对步骤。同步强化 `ATTRIBUTION.md` 和 README 的创意来源、感谢、非官方衍生与无背书声明；修正 `PROJECT_CONTEXT.md` 中“当前目录没有 Git”的过期状态。
+- **修改的文件**：`GITHUB_PUBLISHING_SAFETY.md`、`ATTRIBUTION.md`、`README.md`、`PROJECT_CONTEXT.md`、`CHANGELOG.md`。
+- **验证**：检查 Markdown 文件存在、内部链接目标、仓库地址和禁止写入规则文本；检查 `git remote -v`，确认本地 `origin` 指向 `LEASE-2473/ST-Memory-Context`。
+- **未完成事项**：本轮仅修改本地 Markdown，没有提交、推送、创建 PR、Issue、评论或其他 GitHub 写操作。
+- **已知风险与建议**：当前 GitHub 仓库仍显示 Fork 来源关系；这不会自动影响原作者仓库。若未来希望迁移成完全独立的非 Fork 仓库，必须由 LEASE 明确授权后单独处理。
+
 ## 2026-08-02 恢复上游“注入记忆表格”配置样式
 
 - **用户目标**：注入记忆表格功能不做 LEASE 化 UI，恢复上游原本的样式、名称和位置。

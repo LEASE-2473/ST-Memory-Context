@@ -4,6 +4,8 @@
 
 > 本项目基于 [gaigai315/ST-Memory-Context](https://github.com/gaigai315/ST-Memory-Context) 修改，保留原项目贡献者的署名，并按照原项目 README 声明的 MIT License 发布。本仓库是由 LEASE 维护的非官方衍生版本，与原作者不存在官方隶属或背书关系。详细归属与改动范围见 [ATTRIBUTION.md](ATTRIBUTION.md)。
 
+> GitHub 发布与维护必须遵守 [GITHUB_PUBLISHING_SAFETY.md](GITHUB_PUBLISHING_SAFETY.md)：原作者仓库只用于只读参考和署名，绝不向其推送、提交 PR、Issue、评论或其他会产生影响与通知的内容。
+
 ## 保留功能
 
 - 记忆表格的查看、手动编辑、导入导出和自定义表格结构。
@@ -58,7 +60,7 @@ https://github.com/LEASE-2473/ST-Memory-Context
 
 ## 版本
 
-- 插件版本：3.3.1
+- 插件版本：3.3.2
 - 本地魔改维护者：LEASE
 - 原项目：gaigai315 / Gaigai Team 的 ST-Memory-Context
 - 许可证：MIT，详见 `LICENSE`
