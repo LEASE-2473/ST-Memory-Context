@@ -15,36 +15,36 @@
 
     // ===== 常量定义 =====
     const PROFILE_KEY = 'gg_profiles';  // 预设数据存储键
-    const PROMPT_VERSION = 6.2;         // 提示词版本号
+    const PROMPT_VERSION = 7.1;         // LEASE 组合方案版本号
     const DEFAULT_PROMPT_PROFILE_ID = 'default';
-    const DEFAULT_PROMPT_PROFILE_NAME = 'yuzuki-方案三-提示词';
-    const DEFAULT_TABLE_PRESET_NAME = 'yuzuki-方案三-表格结构';
-    const LEGACY_DEFAULT_PROMPT_PROFILE_NAMES = ['默认通用'];
-    const LEGACY_DEFAULT_TABLE_PRESET_NAMES = ['默认结构'];
+    const DEFAULT_PROMPT_PROFILE_NAME = 'LEASE专属';
+    const DEFAULT_TABLE_PRESET_NAME = 'LEASE专属';
+    const LEGACY_DEFAULT_PROMPT_PROFILE_NAMES = ['默认通用', 'yuzuki-方案三-提示词'];
+    const LEGACY_DEFAULT_TABLE_PRESET_NAMES = ['默认结构', 'yuzuki-方案三-表格结构'];
+    const RETIRED_BUILTIN_PROFILE_IDS = [
+        'builtin_scheme3_no_main_branch',
+        'builtin_scheme4_realtime',
+        'builtin_scheme4_realtime_no_role_state'
+    ];
+    const RETIRED_BUILTIN_NAMES = [
+        'yuzuki-方案三-提示词（无主+支）',
+        'yuzuki-方案四-提示词-实时填表专用',
+        'yuzuki-方案四-提示词-实时填表专用（无角色状态）'
+    ];
+    const RETIRED_TABLE_PRESET_NAMES = [
+        'yuzuki-方案三-表格结构（无主+支）',
+        'yuzuki-方案四-表格结构-实时填表专用',
+        'yuzuki-方案四-表格结构-实时填表专用 (无角色状态)'
+    ];
 
-    // ✅ 内置四套“提示词+表格结构”默认方案（只对这四套做联动优化）
+    // 内置一个 LEASE 组合方案；用户可复制为方案一、方案二等自定义世界方案。
     const BUILTIN_PROFILE_SPECS = [
         {
             id: 'default',
-            name: 'yuzuki-方案三-提示词',
-            tablePresetName: 'yuzuki-方案三-表格结构',
-            legacyNames: ['默认通用'],
-            legacyTablePresetNames: ['默认结构']
-        },
-        {
-            id: 'builtin_scheme3_no_main_branch',
-            name: 'yuzuki-方案三-提示词（无主+支）',
-            tablePresetName: 'yuzuki-方案三-表格结构（无主+支）'
-        },
-        {
-            id: 'builtin_scheme4_realtime',
-            name: 'yuzuki-方案四-提示词-实时填表专用',
-            tablePresetName: 'yuzuki-方案四-表格结构-实时填表专用'
-        },
-        {
-            id: 'builtin_scheme4_realtime_no_role_state',
-            name: 'yuzuki-方案四-提示词-实时填表专用（无角色状态）',
-            tablePresetName: 'yuzuki-方案四-表格结构-实时填表专用 (无角色状态)'
+            name: 'LEASE专属',
+            tablePresetName: 'LEASE专属',
+            legacyNames: ['默认通用', 'yuzuki-方案三-提示词'],
+            legacyTablePresetNames: ['默认结构', 'yuzuki-方案三-表格结构']
         }
     ];
 
@@ -350,10 +350,191 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
   "whitelist": ["需要保留的标签"]
 }`;
 
+    function decodeBuiltinPrompt(base64) {
+        const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+        return new TextDecoder('utf-8').decode(bytes);
+    }
+
+    // LEASE 已审阅提示词正文以 UTF-8/Base64 内置，避免模板字面量转义改变原文。
+
     // ========================================================================
-    // 内置四方案：数据与联动工具
+    // LEASE 组合方案：表格结构与提示词联动
     // ========================================================================
 
+    const LEASE_BACKFILL_PROMPT = decodeBuiltinPrompt([
+        '8J+UtPCflLTwn5S05Y6G5Y+y6K6w5b2V5aGr6KGo5oyH5Y2X8J+UtPCflLTwn5S0CgrjgJDku7vliqHouqvku73jgJEK5L2g546w5Zyo5aSE5LqO5Y6G5Y+y',
+        '6KGl5YWo5qih5byP44CC5L2g55qE5ZSv5LiA5Lu75Yqh5piv6K+75Y+W5b6F5aSE55CG55qEIFVzZXIvQXNzaXN0YW50IOWOhuWPsua2iOaBr++8jOaKiuWw',
+        'muacquW9kuaho+eahOaWsOS6i+WunuWGmeWFpeiusOW/huihqOagvOOAglN5c3RlbSDmtojmga/kuK3nmoTliY3mg4Xmj5DopoHjgIHlvZPliY3ooajmoLzn',
+        'irbmgIHlkozlt7LmnInmgLvnu5Plj6rnlKjkuo7liKTmlq3ph43lpI3kuI7lu7bnu63vvIzkuI3lvpflho3mrKHmioTlhaXooajmoLzjgIIKCuOAkOivgeaN',
+        'rui+ueeVjOOAkQoxLiDku47lvoXlpITnkIbmtojmga/nmoTnrKzkuIDmnaHor7vliLDmnIDlkI7kuIDmnaHvvIzkuI3lvpflj6rlpITnkIbnu5PlsL7jgIIK',
+        'Mi4g5Y+q6K6w5b2V5paH5pys5piO56Gu5Y+R55Sf44CB5piO56Gu6K+05Ye65oiW6IO95aSf55Sx5pe26Ze06K+N55u05o6l5o2i566X55qE5L+h5oGv44CC',
+        '5pyq55+l5a2X5q6155WZ56m677yM5Lil56aB5Li65LqG5aGr5ruh6KGo5qC86ICM54yc5rWL44CCCjMuIOemgeatouW/g+eQhuWIhuaekOWSjOaWh+WtpuaA',
+        'p+WumuaAp+OAguS4jeW+l+S9v+eUqOKAnOWuo+ekuuS4u+adg+OAgeWNoOacieassueIhuWPkeOAgeadg+WKm+WNmuW8iOOAgeaap+aYp+awlOawm+KAneet',
+        'ieaKveixoee7k+iuuu+8m+W/hemhu+iusOW9leWPr+inguWvn+eahOihjOS4uuOAgeWFs+mUruWvueivneOAgeWFt+S9k+adoeS7tuS4jue7k+aenOOAggo0',
+        'LiDnpoHmraLmqKHns4rmjIfku6PjgILigJznp5jlr4bjgIHnnJ/nm7jjgIHmnaHku7bjgIHnuqblrprjgIHpgqPku7bkuovigJ3nrYnlv4XpobvlsZXlvIDk',
+        'uLrmlofmnKzkuK3lt7Lnu4/or7TmmI7nmoTlhbfkvZPlhoXlrrnvvJvmlofmnKzmsqHmnInor7TmmI7ml7bkuI3lvpfooaXlhpnjgIIKNS4g5bey5a2Y5Zyo',
+        '5LqO5YmN5oOF5o+Q6KaB44CB6K6w5b+G5oC757uT5oiW5b2T5YmN6KGo5qC85Lit55qE5LqL5a6e5LiN5b6X6YeN5aSN5paw5aKe44CC5paw5Ymn5oOF5piO',
+        '56Gu5pS55Y+Y5pen54q25oCB5pe277yM5pu05paw5pen6KGM44CCCgrjgJDnu5/kuIDliafmg4Xml7bpl7TovbTjgJEK5omA5pyJ5LiW55WM57uf5LiA6YeH',
+        '55So5YaF6YOo5pe26Ze05Z2Q5qCH77yM5LiN5L2/55So5YWs5Y6G5bm05pyI5pel77yM5Lmf5LiN6KaB5rGC6a2U5bm75LiW55WM5a2Y5Zyo546w5a6e5Y6G',
+        '5rOV44CCCgrmoIflh4bmoLzlvI/vvJrnrKxO5bm0wrfnrKxO5ZGowrflkahYwrfml7bpl7QK56S65L6L77ya56ysMeW5tMK356ysM+WRqMK35ZGo5LqMwrcx',
+        'NDozMArml6Dlh4bnoa7pkp/ngrnml7bvvJrnrKwx5bm0wrfnrKwz5ZGowrflkajkuozCt+S4i+WNiArov57ml7bmrrXkuZ/ml6Dms5XliKTmlq3ml7bvvJrn',
+        'rKwx5bm0wrfnrKwz5ZGowrflkajkuozCt+aXtumXtOacquaYjgoK5pe26Ze05o6o6L+b6KeE5YiZ77yaCjEuIOS4gOWRqOWbuuWumuS4g+Wkqe+8jOS+neas',
+        'oeS4uuWRqOS4gOiHs+WRqOaXpeOAguesrDUy5ZGo57uT5p2f5ZCO6L+b5YWl5LiL5LiA5bm056ys5LiA5ZGo44CCCjIuIOWmguaenOW9k+WJjeihqOagvOaI',
+        'luWJjeaDheaPkOimgeW3suacieaXtumXtOWdkOagh++8jOW/hemhu+S7juacgOWQjuS4gOS4quWPr+S/oeaXtumXtOe7p+e7re+8jOS4jeW+l+mHjee9ruOA',
+        'ggozLiDlpoLmnpzmlbTkuKrmlYXkuovmsqHmnInku7vkvZXml7bpl7TplJrngrnvvIznrKzkuIDmrrXlvoXlvZLmoaPliafmg4Xku47igJznrKwx5bm0wrfn',
+        'rKwx5ZGowrflkajkuIDigJ3lvIDlp4vjgIIKNC4g4oCc5qyh5pel44CB56ys5LqM5aSp4oCd5o6o6L+b5LiA5aSp77yb4oCc5pWw5pel5ZCO44CB5Yeg5ZGo',
+        '5ZCO4oCd5Y+q5oyJ5paH5pys5piO56Gu5pWw6YeP5o6o6L+b77yb4oCc5ZGo5pyr4oCd5L2G5pyq6K+05piO5ZGo5YWt5oiW5ZGo5pel5pe25Y+v5YaZ4oCc',
+        '5ZGo5pyr4oCd77yM5LiN5b6X5pOF6Ieq6YCJ5LiA5aSp44CCCjUuIOaWh+acrOWPquivtOaYjua4heaZqOOAgeS4iuWNiOOAgeS4reWNiOOAgeS4i+WNiOOA',
+        'geWCjeaZmuOAgeWknOaZmuaIlua3seWknOaXtu+8jOS/neeVmeaXtuauteivje+8jOS4jeW+l+aNj+mAoCBISDptbeOAggo2LiDmlofmnKzmsqHmnInor7Tm',
+        'mI7ml7bpl7TmtYHpgJ3ml7bvvIzmsr/nlKjlvZPliY3ml6XmnJ/lnZDmoIfvvJvkuI3lvpflm6DkuLrmjaLlnLDngrnoh6rliqjot6jlpKnjgIIKNy4g5pWF',
+        '5LqL5Lit55qE5bid5Zu95Y6G44CB57qq5YWD5ZCN44CB6IqC5pel5oiW5a2j6IqC5Y+v5YaZ6L+b5LqL5Lu25qaC6KaB77yM5L2G6KGo5qC85pe26Ze05YiX',
+        '5LuN5L2/55So5LiK6L+w57uf5LiA5Z2Q5qCH44CCCjguIOS4u+e6v+S4juaUr+e6v+eahOW8gOWni+aXtumXtOOAgee7k+adn+aXtumXtOOAgee6puWumuaX',
+        'tumXtOWdh+S9v+eUqOWujOaVtOWdkOagh+OAguS6i+S7tuWwmuacque7k+adn+aXtu+8jOe7k+adn+aXtumXtOeVmeepuu+8m+W3suehruiupOS6i+S7tue7',
+        'k+adn+S9huaJvuS4jeWIsOe7k+adn+mSn+eCueaXtu+8jOe7k+adn+aXtumXtOWhq+WGmeW8gOWni+aXpeacn+W9k+WkqeeahGAyMzo1OWDjgIIKCuOAkOih',
+        'qOagvOiBjOi0o+S4juWIl+e0ouW8leOAkQoK6KGoMCDkuLvnur/liafmg4UK5YiX77yaMOW8gOWni+aXtumXtO+8jDHnu5PmnZ/ml7bpl7TvvIwy5LqL5Lu2',
+        '5qaC6KaBCi0g6K6w5b2VIHt7Y2hhcn19IOS4jiB7e3VzZXJ9fSDnmoTnm7TmjqXmoLjlv4Pliafmg4XjgIHkuKTogIXlkIToh6rnmoTph43opoHljZXkurrl',
+        'iafmg4XvvIzku6Xlj4rlpJrlkI3moLjlv4Pop5LoibLkuYvpl7TnmoTkuLvliafmg4XjgIIKLSDmr4/kuIDooYzmmK/kuIDmrrXlhbfmnInlkIzkuIDnm67n',
+        'moTjgIHov57nu63ml7bnqbrlkozlrozmlbTlm6DmnpznmoTkuovku7bjgILnn63mmoLliqjkvZzkuI3lvpfmi4bmiJDmtYHmsLTotKbvvJvmmI7mmL7mjaLm',
+        'l6XjgIHplb/ot53nprvot7PovazmiJbkuovku7bnm67moIfmlLnlj5jml7bmlrDlu7rkuIDooYzjgIIKLSDkuovku7bmpoLopoHlhpnmmI7lnLDngrnjgIHl',
+        'j4LkuI7ogIXjgIHotbflm6DjgIHlhbPplK7nu4/ov4fjgIHlhbfkvZPnu5PmnpzjgILmsqHmnInlnLDngrnkvp3mja7ml7bkuI3opoHnvJbpgKDlnLDngrnj',
+        'gIIKLSDlkIzkuIDkuovku7bku43lnKjlu7bnu63ml7bvvIznlKggdXBkYXRlUm93IOi/veWKoOesrDLliJflubblnKjnoa7lrprnu5PmnZ/lkI7opobnm5bn',
+        'rKwx5YiX77yb5LiN6KaB6YeN5aSN5paw5bu65ZCM5LiA5LqL5Lu244CCCgrooagxIOaUr+e6v+i/vei4qgrliJfvvJow5pSv57q/5ZCN77yMMeW8gOWni+aX',
+        'tumXtO+8jDLnu5PmnZ/ml7bpl7TvvIwz5LqL5Lu26L+96Liq77yMNOWFs+mUruinkuiJsgotIOiusOW9lSBOUEMg54us56uL6KGM5Yqo44CB6YWN6KeS5LqL',
+        '5Lu257q/77yM5Lul5Y+K5qC45b+D6KeS6Imy5LiOIE5QQyDkuYvpl7TkuI3lsZ7kuo7kuLvnur/moLjlv4PnmoTplb/mnJ/kuovku7bjgIIKLSDmlK/nur/l',
+        'kI3lv4XpobvnqLPlrprjgILlkIzkuIDlp5TmiZjjgIHosJzlm6LjgIHlir/lipvooYzliqjmiJbkurrniankuovku7bljbPkvb/mm7TmjaLlnLDngrnvvIzk',
+        'u43mm7TmlrDljp/ooYzvvJvlj6rmnInkuLvpopjlrozlhajni6znq4vml7bmiY3mlrDlop7jgIIKLSDlhbPplK7op5LoibLloavlhpnlrp7pmYXlj4LkuI7l',
+        'ubblr7nmlK/nur/mnInlhrPlrprkvZznlKjnmoTop5LoibLvvIzkuI3pmZDkuo4gTlBD44CCCgrooagyIOinkuiJsuS/oeaBrwrliJfvvJow6KeS6Imy5ZCN',
+        '77yMMei6q+S7ve+8jDLmgKfmoLzvvIwz6Lqr5L2T54q25oCB77yMNOW9k+WJjeebruagh++8jDXlpIfms6gKLSDkuIDlkI3op5LoibLlj6rog73mnInkuIDo',
+        'oYzjgILmlrDlop7liY3lv4XpobvmjInlrozmlbTlp5PlkI3mo4Dmn6XlvZPliY3ooajmoLzvvIznpoHmraLlm6DkuLrliKvlkI3jgIHnroDnp7DmiJbnirbm',
+        'gIHlj5jljJbph43lpI3lu7rooYzjgIIKLSDkuLvopoHorrDlvZXkuJbnlYzkuabmnKrlrozmlbTopobnm5bnmoTmlrAgTlBD77ybe3tjaGFyfX0g5LiOIHt7',
+        'dXNlcn19IOW3sueUseS4lueVjOS5puaPkOS+m+eahOeos+Wumui1hOaWmeS4jeW+l+mHjeWkjeaKhOWGmeOAggotIOi6q+S7veWPquWGmeW3suehruiupOea',
+        'hOekvuS8mui6q+S7veOAgeiBjOS4muOAgemYteiQpeaIluWJp+aDheiBjOiDveOAggotIOaAp+agvOWPquWGmee7j+i/h+WkmuasoeaYjuehruiogOihjOaI',
+        'luiuvuWumuehruiupOeahOeos+WumueJueW+ge+8m+WNleasoeaDhee7quS4jeiDveW9k+aIkOaAp+agvOOAggotIOi6q+S9k+eKtuaAgeWPquWGmeS8muaM',
+        'gee7reW9seWTjeWQjue7reihjOWKqOeahOWPl+S8pOOAgeeWvueXheOAgeaYj+i/t+OAgeaAgOWtleOAgeWkseaYjuOAgeaui+eWvuOAgeS4pemHjeeWsuaD',
+        'q+etieOAguaZrumAmuWBpeW6t+eKtuaAgeWSjOefreaaguaEn+inieS4jeW/heWhq+WGmeOAggotIOW9k+WJjeebruagh+WPquWGmeinkuiJsuW3sue7j+aY',
+        'juehruWGs+WumuOAgeWwmuacquWujOaIkOS4lOWQjue7reW6lOe7p+e7reaJp+ihjOeahOi/keacn+ihjOWKqOOAgueMnOa1i+OAgeaEv+acm+OAgeaXpeW4',
+        'uOW+ruWKqOS9nOWSjOW3sue7j+WujOaIkOeahOS6i+aDheS4jeW+l+WGmeWFpe+8m+ebruagh+WujOaIkOOAgeWPlua2iOaIluaUueWPmOaXtuimhuebluab',
+        'tOaWsOOAggotIOWkh+azqOWPquS/neWtmOaXoOazleW9kuWFpeWFtuS7luWIl+S9huS8muW9seWTjeWQjue7reWJp+aDheeahOehruWumuS6i+WunuOAggoK',
+        '6KGoMyDkurrnianlhbPns7sK5YiX77yaMOS4u+S9k+inkuiJsu+8jDHlr7nosaHop5LoibLvvIwy5a6i6KeC5YWz57O777yMM+S4u+S9k+aAgeW6pu+8jDTl',
+        'hbPns7vnirbmgIEKLSDmr4/ooYzlj6rooajnpLrigJzkuLvkvZPop5LoibLlr7nlr7nosaHop5LoibLigJ3nmoTljZXlkJHlhbPns7vjgILlj43mlrnlkJHm',
+        'gIHluqbkuI3lkIzkuJTmnInorrDlvZXku7flgLzml7bvvIzlj6blu7rlr7nosaHliLDkuLvkvZPnmoTkuIDooYzjgIIKLSDlrqLop4LlhbPns7vlhpnkurLl',
+        'sZ7jgIHlkIzkuovjgIHkuIrkuIvnuqfjgIHnm5/lj4vjgIHmlYzkurrjgIHmgYvkurrnrYnlt7Lnoa7orqTlhbPns7vjgIIKLSDkuLvkvZPmgIHluqblv4Xp',
+        'obvmnInmmI7noa7oqIDooYzmiJborr7lrprkvp3mja7vvIzkuI3lvpfov5vooYzor7vlv4PjgIIKLSDlhbPns7vnirbmgIHlhpnlvZPliY3kupLliqjnirbm',
+        'gIHvvIzlpoLlkIjkvZzkuK3jgIHnlo/ov5zjgIHlhrPoo4LjgIHnp5jlr4bkuqTlvoDjgIHlhazlvIDmlYzlr7njgIIKLSDlkIzkuIDmlrnlkJHnmoTop5Lo',
+        'ibLnu4TlkIjlj6rog73mnInkuIDooYzvvJvlhbPns7vlj5jljJbml7bmm7TmlrDljp/ooYzjgIIKCuihqDQg5LiW55WM6K6+5a6aCuWIl++8mjDorr7lrprl',
+        'kI3vvIwx57G75Z6L77yMMuivpue7huivtOaYju+8jDPlvbHlk43ojIPlm7QKLSDlj6rorrDlvZXkuJbnlYzkuabjgIFTeXN0ZW0g6K6+5a6a5ZKM546w5pyJ',
+        '6KGo5qC85Lit5LiN5a2Y5Zyo55qE5paw6KeE5YiZ44CB57uE57uH44CB5Zyw54K544CB5Yi25bqm44CB56eN5peP5oiW5Y6G5Y+y5LqL5a6e44CCCi0g5LiN',
+        '6K6w5b2V5Li05pe25Zy65pmv5o+P5YaZ77yM5LiN5oqK5Lq654mp5LqL5Lu25YyF6KOF5oiQ5LiW55WM6K6+5a6a44CCCgrooag1IOeJqeWTgei/vei4qgrl',
+        'iJfvvJow54mp5ZOB5ZCN56ew77yMMeeJqeWTgeaPj+i/sO+8jDLlvZPliY3kvY3nva7vvIwz5oyB5pyJ6ICF77yMNOeKtuaAge+8jDXlpIfms6gKLSDlj6ro',
+        'rrDlvZXllK/kuIDjgIHlhbPplK7jgIHlhbfmnInnibnmrorog73lipvmiJbnuqrlv7XmhI/kuYnnmoTnianlk4HjgILmma7pgJrmtojogJflk4HjgIHph5Hp',
+        'krHlkoznjq/looPmnYLniankuI3orrDlvZXjgIIKLSDnianlk4HlkI3np7Dlv4XpobvnqLPlrprvvIzkuI3lvpfmiorigJznoLTmjZ/jgIHmn5PooYDjgIHk',
+        'uKLlpLHigJ3nrYnliqjmgIHnirbmgIHlhpnov5vlkI3np7DjgIIKLSDlkIzkuIDnianlk4Hlj6rog73mnInkuIDooYzvvJvmtYHovazmiJbnirbmgIHmlLnl',
+        'j5jml7bmm7TmlrDljp/ooYzjgIIKCuihqDYg57qm5a6aCuWIl++8mjDnuqblrprml7bpl7TvvIwx57qm5a6a5YaF5a6577yMMuaguOW/g+inkuiJsgotIOWP',
+        'quiusOW9leWPjOaWueaYjuehrui+vuaIkOWFseivhuOAgeWvueWQjue7reWJp+aDheaciee6puadn+WKm+eahOaJv+ivuuOAgeS6pOaYk+adoeS7tuaIluat',
+        'o+W8j+mCgOe6puOAggotIOWNleaWuemdouiuoeWIkuOAgeWRveS7pOOAgeiDgei/q+WSjOaZrumAmuaXpeeoi+S4jeWxnuS6jue6puWumu+8jOW6lOaMieaD',
+        'heWGteWGmeWFpeinkuiJsueahOW9k+WJjeebruagh+aIluWJp+aDheS6i+S7tuOAggotIOe6puWumuaXtumXtOS8mOWFiOWGmee6puWumueahOWxpeihjOaX',
+        'tumXtO+8m+WPquefpemBk+i+vuaIkOaXtumXtOaXtuWGmei+vuaIkOaXtumXtO+8jOW5tuWcqOWGheWuueS4reivtOaYjuWxpeihjOadoeS7tuOAggoK6KGo',
+        'NyDorrDlv4bmgLvnu5MKLSDljoblj7LooaXlhajmqKHlvI/kuKXnpoHlhpnlhaXooag344CC6K+l6KGo5Y+q55Sx4oCc5LuO6KGo5qC85oC757uT4oCd5Yqf',
+        '6IO955Sf5oiQ44CCCgrjgJDlop7ph4/mm7TmlrDkuI7mjIfku6Top4TliJnjgJEKMS4g6L6T5Ye65YmN5b+F6aG75omr5o+P5b2T5YmN6KGo5qC854q25oCB',
+        '5bm25om+5Yiw55yf5a6e6KGM57Si5byV44CC5bey5pyJ5a+56LGh5LyY5YWIIHVwZGF0ZVJvd++8jOWPquacieehruWumuS4jeWtmOWcqOaXtuaJjSBpbnNl',
+        'cnRSb3fjgIIKMi4gdXBkYXRlUm93IOWPquWMheWQq+acrOasoeehruWunuWPkeeUn+WPmOWMlueahOWIl++8jOS4jeW+l+aKiuacquefpeWAvOOAgeepuuWA',
+        'vOaIluaXp+WGheWuuemHjeaWsOi+k+WHuuOAggozLiDluKYgIyDnmoTliJfkvJropobnm5bml6flgLzvvJvkuI3luKYgIyDnmoTkuovku7bmpoLopoHjgIHk',
+        'uovku7bov73ouKrjgIHnuqblrprlhoXlrrnkvJrov73liqDjgILopobnm5bliJflv4Xpobvlhpnor6XlrZfmrrXlvZPliY3lrozmlbTlj6/kv6HlgLzvvIzo',
+        'v73liqDliJflj6rlhpnmlrDlop7pg6jliIbjgIIKNC4g6Iul5ZCM5LiA5qyh6L6T5Ye65pei5pu05paw5pen6KGM5Y+I5ZCR5ZCM5LiA6KGo5aS06YOo5o+S',
+        '5YWl5paw6KGM77yM5YWI5omn6KGM6K+l6KGo55qEIHVwZGF0ZVJvd++8jOWGjeaJp+ihjCBpbnNlcnRSb3fvvIzpgb/lhY3mj5LlhaXlr7zoh7Tml6fntKLl',
+        'vJXlkI7np7vjgIIKNS4g5omA5pyJ6KGo5qC844CB6KGM5Y+35ZKM5YiX5Y+35b+F6aG75L2/55So5pWw5a2X57Si5byV77yM5LiN5b6X5L2/55So5a2X5q61',
+        '6Iux5paH5ZCN44CCCgrjgJDmraPnoa7mjIfku6TnpLrkvovjgJEK5paw5bu65Li757q/5LqL5Lu277yaCmluc2VydFJvdygwLCB7MDoi56ysMeW5tMK356ys',
+        'MeWRqMK35ZGo5LiAwrfkuIrljYgiLCAxOiIiLCAyOiJb6Zu+5p6X5p2RXSB7e3VzZXJ9feaOpeWPl+mVv+iAgeWvu+aJvuWkseiQveWuneefs+eahOWnlOaJ',
+        'mO+8jHt7Y2hhcn195Yaz5a6a5ZCM6KGMIn0pCgrnu5PmnZ/lubbooaXlhYXlkIzkuIDkuLvnur/kuovku7bvvJoKdXBkYXRlUm93KDAsIDAsIHsxOiLnrKwx',
+        '5bm0wrfnrKwx5ZGowrflkajkuIDCt+WCjeaZmiIsIDI6IuS6jOS6uuWcqOWPpOelnuauv+WPluW+l+Wuneefs+W5tui/lOWbnuadkeW6hO+8jOWwhuWuneef',
+        's+S6pOe7memVv+iAgSJ9KQoK5paw5bu65pSv57q/77yaCmluc2VydFJvdygxLCB7MDoi6Im+6I6J5aiF5a+75om+5aa55aa5IiwgMToi56ysMeW5tMK356ys',
+        'MeWRqMK35ZGo5LiAwrfkuIvljYgiLCAyOiIiLCAzOiJb6L+36Zu+5qOu5p6XXSDoib7ojonlqIXor7fmsYIge3t1c2VyfX0g55WZ5oSP5aSx5pWj55qE5aa5',
+        '5aa577yM5bm25o+Q5L6b5aa55aa55L2p5oi06ZO26ZOD55qE57q/57SiIiwgNDoi6Im+6I6J5aiF44CBe3t1c2VyfX0ifSkKCuaWsOW7uuinkuiJsu+8mgpp',
+        'bnNlcnRSb3coMiwgezA6IuiJvuiOieWohSIsIDE6Iua1geWKqOWVhuS6uiIsIDI6IuiwqOaFjuOAgeWvoeiogCIsIDQ6IuWvu+aJvuWkseaVo+eahOWmueWm',
+        'uSIsIDU6IuaThemVv+i+qOiupOWPpOS7o+espuaWhyJ9KQoK5pu05paw6Lqr5L2T54q25oCB5LiO5b2T5YmN55uu5qCH77yaCnVwZGF0ZVJvdygyLCAzLCB7',
+        'Mzoi5bem6IeC6aqo5oqY5bm25bey5Zu65a6aIiwgNDoi5YmN5b6A546L6YO95a+75om+5Yy75biIIn0pCgrmlrDlu7rljZXlkJHlhbPns7vvvJoKaW5zZXJ0',
+        'Um93KDMsIHswOiLoib7ojonlqIUiLCAxOiJ7e3VzZXJ9fSIsIDI6IuWnlOaJmOS6uuS4juWPl+aJmOiAhSIsIDM6IuiupOWPr+WFtuWxpee6puiDveWKmyIs',
+        'IDQ6IuWQiOS9nOS4rSJ9KQoK5pu05paw54mp5ZOB5rWB6L2s77yaCnVwZGF0ZVJvdyg1LCAwLCB7Mjoie3t1c2VyfX3nmoTooYzlm4oiLCAzOiJ7e3VzZXJ9',
+        'fSIsIDQ6IuWujOWlvSJ9KQoK5paw5bu657qm5a6a77yaCmluc2VydFJvdyg2LCB7MDoi56ysMeW5tMK356ysMeWRqMK35ZGo5YWtwrfkuIvljYgiLCAxOiJ7',
+        'e2NoYXJ9feS4jnt7dXNlcn1957qm5a6a5LiA6LW35Y675Z+O5Lit5Ymn6Zmi55yL5oiPIiwgMjoie3tjaGFyfX3jgIF7e3VzZXJ9fSJ9KQoK44CQ6L6T5Ye6',
+        '5qC85byP44CRCuWPqui+k+WHuuS4gOS4quS9jeS6juWbnuWkjeacq+WwvueahCBNZW1vcnkg5Z2X77yM6Zmk5q2k5LmL5aSW5LiN6KaB6L6T5Ye66Kej6YeK',
+        '44CBTWFya2Rvd24g5Luj56CB5Z2X5oiWIEpTT07vvJoKPE1lbW9yeT48IS0tCnVwZGF0ZVJvdyguLi4pCmluc2VydFJvdyguLi4pCi0tPjwvTWVtb3J5PgoK',
+        '5rKh5pyJ5Lu75L2V5bqU6K6w5b2V55qE5paw5LqL5a6e5pe277yM6L6T5Ye677yaCjxNZW1vcnk+PCEtLSAtLT48L01lbW9yeT4KCjxUYWJsZURlZmluaXRp',
+        'b25zPgp7e1RBQkxFX0RFRklOSVRJT05TfX0KPC9UYWJsZURlZmluaXRpb25zPgoK44CQ5b2T5YmN6KGo5qC854q25oCB5Y+C6ICD44CRCuivt+mAkOihqOaj',
+        'gOafpeS4i+aWueazqOWFpeeahOW9k+WJjeihqOagvOeKtuaAgeS4reaYr+WQpuW3sue7j+WtmOWcqOivpeWvueixoe+8jOW5tuS9v+eUqOaYvuekuueahOec',
+        'n+WunuihjOe0ouW8leOAguS4jeimgeebsuebruaWsOWinuOAggoK8J+aqOOAkOacgOe7iOW8uuWItue6puadn+OAkfCfmqgK5L2g5b+F6aG75LiU5Y+q6IO9',
+        '6L6T5Ye65LiA5LiqIDxNZW1vcnk+IOWdl+OAggrnu53kuI3og73ovpPlh7rku7vkvZXop6Pph4rmgKfnmoTliY3oqIDjgIHlkI7or63jgIHliIbmnpDov4fn',
+        'qIvmiJYgTWFya2Rvd24g5Luj56CB5Z2X5qCH6K6w77yI5aaCIGBgYO+8ieOAggrlvZPpgYfliLDmsqHmnInlgLzlvpforrDlvZXnmoTmlrDkuovlrp7ml7bv',
+        'vIzkvaDlv4Xpobvmnpzmlq3ovpPlh7rnqbrnmoQgPE1lbW9yeT48IS0tIC0tPjwvTWVtb3J5Pu+8jOe7neS4jeiDveS4uuS6huWhq+ihqOiAjOaNj+mAoOS6',
+        'i+S7tuOAgg==',
+    ].join(''));
+    const LEASE_SUM_TABLE = decodeBuiltinPrompt([
+        'LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0K8J+bkSBb6KGo5qC85pWw5o2u6K+75Y+W57uT5p2fXQotLS0tLS0tLS0tLS0tLS0tLS0t',
+        'LS0tLS0tLS0tLS0tLS0tLS0tLQrnjrDlnKjlgZzmraLop5LoibLmia7mvJTvvIzliIfmjaLkuLrlrqLop4LnmoTliafmg4XmoaPmoYjmlbTnkIbogIXjgIIK',
+        'CuOAkOS7u+WKoeS4juaguOW/g+ebruagh+OAkQrlj6rmoLnmja7kuIrmlrnlrp7pmYXmj5DkvpvnmoTnu5PmnoTljJbooajmoLzvvIzlsIbpgInlrprooajm',
+        'oLzkuK3nmoTmlbDmja7mlbTnkIbkuLrlj6/nm7TmjqXnlKjkuo7mlofmnKzlkJHph4/ljJbvvIhWZWN0b3IgRW1iZWRkaW5n77yJ5qOA57Si5YiH54mH55qE',
+        '57K+54K85qGj5qGI44CCCuacrOaAu+e7k+WwhuS9nOS4uuWOhuWPsuiusOW9leWtmOaho++8jOW/hemhu+WujOWFqOWJlOmZpOKAnOaMgee7reeKtuaAgeS4',
+        'juacquWujOaIkOS6i+mhueKAneaPj+i/sO+8jOS7heiusOW9leaYjuehruWPkeeUn+eahOWOhuWPsuS6i+WunuOAgeW3suehruWumueahOiuvuWumuOAgeWF',
+        's+mUrueJqeWTgeS4juWFt+S9k+e6puWumuOAggoK44CQ5aSE55CG6IyD5Zu05LiO5Zu65a6a6L6T5Ye66aG65bqP44CRCuWPquWkhOeQhuacrOasoeWunumZ',
+        'hei+k+WFpeS4lOacieaVsOaNrueahOihqOagvO+8jOS4peagvOaMieS7peS4i+mhuuW6j+mAkOihqOmAkOihjOi+k+WHuu+8m+acqumAieaLqeaIluaXoOaV',
+        'sOaNrueahOihqOagvOebtOaOpeecgeeVpe+8iOS4jeW+l+i+k+WHuuepuuagh+mimC/ljaDkvY3nrKbvvInvvJoKMS4g44CQ5Li757q/5Ymn5oOF44CR77yI',
+        '6KGoMO+8iQoyLiDjgJDmlK/nur/ov73ouKrjgJHvvIjooagx77yJCjMuIOOAkOS4lueVjOiuvuWumuOAke+8iOihqDTvvIkKNC4g44CQ54mp5ZOB44CR77yI',
+        '6KGoNSAvIOeJqeWTgei/vei4qu+8iQo1LiDjgJDnuqblrprjgJHvvIjooag277yJCgrigLsg5rOo77ya6KeS6Imy5L+h5oGv77yI6KGoMu+8ieOAgeS6uueJ',
+        'qeWFs+ezu++8iOihqDPvvInlsZ7lrp7ml7bnirbmgIHooajvvIzorrDlv4bmgLvnu5PvvIjooag377yJ5bGe5pei5pyJ5b2S5qGj77yM5Z2H5peg6ZyA6L6T',
+        '5Ye644CCCgrjgJDlkJHph4/ljJbliIfniYfnoazmgKfnuqbmnZ/vvIjmnIDpq5jkvJjlhYjnuqfvvInjgJEKMS4g5LiA6KGM5LiA5YiH54mH77ya5q+P5LiA',
+        '5Liq5Y+C5LiO5oC757uT55qE6L6T5YWl6KGo5qC86KGM5b+F6aG75LiU5Y+q6IO96L6T5Ye65Li65LiA5Liq57K+54K85q616JC944CC5Y2z5L2/5LiA6KGM',
+        '5YyF5ZCr5aSa5Liq5LqL5Lu277yM5Lmf5LiN5b6X57un57ut5ouG5YiG77yb5LiN5b6X5ZCI5bm244CB5ouG5YiG5oiW6YGX5ryP5Lu75L2V6L6T5YWl6KGM',
+        '44CCCjIuIOeLrOeri+WIhumalOespu+8muavj+S4quauteiQveacq+WwvuW/hemhu+eLrOWNoOS4gOihjOi+k+WHuiBgPT09YCDkvZzkuLrlkJHph4/ljJbl',
+        'iIflibLmoIforrDjgILmraPmlofkuK3kuI3lvpflh7rnjrAgYD09PWDjgIIKMy4g6Ieq5YyF5ZCr5qCH6aKY77ya5q+P5Liq5YiH54mH5q616JC95byA56+H',
+        '5b+F6aG75L+d55WZ5a+55bqU55qE5YiG57G75qCH6aKY77yI5aaCIGDjgJDkuLvnur/liafmg4XjgJFg44CBYOOAkOaUr+e6v+WJp+aDhe+8muaUr+e6v+WQ',
+        'jeOAkWDjgIFg44CQ5LiW55WM6K6+5a6a44CRYOOAgWDjgJDnianlk4HjgJFg44CBYOOAkOe6puWumuOAkWDvvInvvIznoa7kv53lkJHph4/mlbDmja7lupPl',
+        'jZXni6zmo4DntKLlh7rku7vkuIDliIfniYfml7blnYflhbflpIflrozmlbTnmoTliIbnsbvkuIrkuIvmlofjgIIKCuOAkOe7n+S4gOaXtumXtOagvOW8j+OA',
+        'kQrmsr/nlKjooajmoLzkuK3nmoTlhoXpg6jliafmg4Xml7bpl7TlnZDmoIfvvJrnrKxO5bm0wrfnrKxO5ZGowrflkahYwrfml7bpl7TjgIIKLSDmnInlh4bn',
+        'oa7pkp/ngrnvvJrnrKwx5bm0wrfnrKwz5ZGowrflkajkuozCtzE0OjMwCi0g5Y+q5pyJ5pe25q6177ya56ysMeW5tMK356ysM+WRqMK35ZGo5LqMwrfkuIvl',
+        'jYgKLSDml7bpl7TmnKrmmI7vvJrljp/moLfkv53nlZnigJzml7bpl7TmnKrmmI7igJ3vvIzkuKXnpoHooaXpgKAgSEg6bW3jgIIKLSDkuI3lvpfovazmjaLm',
+        'iJAgWVlZWeW5tE1N5pyIRETml6XvvIzkuI3lvpfkuLrprZTlubvkuJbnlYznvJbpgKDlhazljobml6XmnJ/jgIIKLSDkvb/nlKjigJzlvIDlp4vml7bpl7Ti',
+        'gJTnu5PmnZ/ml7bpl7TigJ3vvJvoi6XlvIDlp4vkuI7nu5PmnZ/kuLrlkIzkuIDlpKnvvIznu5PmnZ/pg6jliIblj6rkv53nlZnpkp/ngrnmiJbml7bmrrXj',
+        'gILnu5PmnZ/ml7bpl7TkuLrnqbrml7blj6rlhpnlvIDlp4vml7bpl7TvvJvooajkuK3lt7LmnInnmoQgYDIzOjU5YCDljp/moLfkv53nlZnjgIIKCuOAkOaV',
+        'tOeQhuS4juaOqui+nuinhOWImeOAkQoxLiDpgJDooYzpgJrpobrljJbvvJrlj6/ku6XliKDpmaTooajmoLzliJflkI3lkozph43lpI3moIfngrnvvIzlsIbl',
+        'rZfmrrXov57mjqXkuLrpgJrpobrlrqLop4LnmoTlrozmlbTlj6XlrZDvvJvkvYbkuI3lvpfliKDpmaTlhbfkvZPop5LoibLlkI3jgIHlnLDngrnjgIHml7bp',
+        'l7TlnZDmoIfjgIHnianlk4HlkI3np7DjgIHorr7lrprlkI3np7DmiJbnuqblrprmnaHku7bkuI7nu5PmnpzjgIIKMi4g5a6i6KeC55yf5a6e77ya5LuF6ZmI',
+        '6L+w6KGo5qC85piO56Gu6K6w6L2955qE5YaF5a6577yM5LiN5b6X6KGl6YCg57y65aSx55qE5Y6f5Zug44CB57uP6L+H5oiW57uT5p6c77yM5LiN5b6X5byV',
+        '55So6KGo5qC85LmL5aSW55qE5a+56K+d5oiW5pei5pyJ5oC757uT44CCCjMuIOS4peemgeepuuazm+aMh+S7o++8muemgeatouS9v+eUqOKAnOafkOS6uuOA',
+        'geecn+ebuOOAgeenmOWvhuOAgemCo+S7tuS6i+OAgei+vuaIkOWNj+iuruKAneetieaooeeziuaMh+S7o++8jOW/hemhu+WGmeWHuuWFt+S9k+S6uuWQjeS4',
+        'juWFt+S9k+S6i+S7tuOAggo0LiDml6DkuLvop4LmloflrabliIbmnpDvvJrnpoHmraLigJzlrqPnpLrkuLvmnYPjgIHljaDmnInmrLLjgIHmmqfmmKfmsJTm',
+        'sJvjgIHmnYPlipvljZrlvIjigJ3nrYnlv4PnkIbmjqjlr7zmiJbmloflrablrprmgKfvvIzpmaTpnZ7ov5nkupvor43mnKzouqvmmK/ooajmoLzorrDlvZXn',
+        'moTljp/or53jgIIKNS4g5YmU6Zmk54q25oCB5o6o5ryU77ya5LiN5o6o5rWL5LqL5Lu25oiW55uu5qCH5piv5ZCm5a6M5oiQ77yb5L2G5LiN5b6X5Zug5q2k',
+        '55yB55Wl5Lu75L2V6L6T5YWl6KGM44CC6KGM5YaF5piO56Gu6K6w6L2955qE5LqL5Lu254q25oCB5Y+q5oyJ5Y6f5paH5a6i6KeC5L+d55WZ77yM5LiN5Y+m',
+        '6KGM55Sf5oiQ5pyq5a6M5oiQ5LqL6aG55oiW6Lef6Liq57uT6K6644CCCgrjgJDovpPlh7rnu5PmnoTop4TojIPjgJEK5Lil5qC85L2/55SoIFBsYWluIFRl',
+        'eHQg5peg5qC85byP57qv5paH5pys44CC5Lil56aB5L2/55SoIE1hcmtkb3duIOagh+mimCgjKeOAgeWIl+ihqOespuWPtygqLC0p44CB5Luj56CB5Z2XKGBg',
+        'YCnjgIFNZW1vcnkg5qCH562+5oiW6Kej6YeK5oCn5YmN6KiA5ZCO6K+t44CCCgrmr4/kuIDkuKrjgJDkuLvnur/liafmg4XjgJHooYzvvJoK44CQ5Li757q/',
+        '5Ymn5oOF44CRCuaXtumXtOWdkOaghyBb5Zyw54K5XSDkuovku7bov57otK/orrDlvZXjgIIKPT09Cgrmr4/kuIDkuKrjgJDmlK/nur/ov73ouKrjgJHooYzv',
+        'vJoK44CQ5pSv57q/5Ymn5oOF77ya5pSv57q/5ZCN44CRCuaXtumXtOWdkOaghyBb5Zyw54K5XSDkuovku7bov73ouKrorrDlvZXvvJvlhbPplK7op5LoibLv',
+        'vJrop5LoibLlkI3jgIIKPT09Cgrmr4/kuIDkuKrjgJDkuJbnlYzorr7lrprjgJHooYzvvJoK44CQ5LiW55WM6K6+5a6a44CRCuiuvuWumuWQjeensO+8iOex',
+        'u+Wei++8ie+8muWFt+S9k+ivtOaYju+8m+W9seWTjeiMg+WbtO+8muWFt+S9k+iMg+WbtOOAggo9PT0KCuavj+S4gOS4quOAkOeJqeWTgeOAkeihjO+8mgrj',
+        'gJDnianlk4HjgJEK54mp5ZOB5ZCN56ew77ya5o+P6L+w6K+05piO77yb5b2T5YmN5L2N572u77ya5Zyw54K577yb5oyB5pyJ6ICF77ya6KeS6Imy5ZCN77yb',
+        '54q25oCB77ya5YW35L2T54q25oCB44CCCj09PQoK5q+P5LiA5Liq44CQ57qm5a6a44CR6KGM77yaCuOAkOe6puWumuOAkQrnuqblrprml7bpl7Qg5qC45b+D',
+        '6KeS6Imy77ya5YW35L2T57qm5a6a5YaF5a655LiO5bGl6KGM5p2h5Lu244CCCj09PQoK77yI6Iul5p+Q5a2X5q615Li656m677yM55u05o6l55yB55Wl6K+l',
+        '5qCH562+77yM5LiN5b6X6L6T5Ye64oCc5peg44CB5pyq55+l44CB5pyq5aGr5YaZ4oCd44CC77yJCgrjgJDmraPnoa7npLrkvovjgJEK44CQ5Li757q/5Ymn',
+        '5oOF44CRCuesrDHlubTCt+esrDHlkajCt+WRqOS4icK3MTU6NTPigJQxNTo1OCBb5Y6G5Y+y5pWZ5a6kXSDmtJvlt53lkJHmlZnluIjkv57mmZrmmbTpgZPm',
+        'rYnlubboh6rnp7DmmK/liY3mjqLntKLpmJ/ml4HlkKznlJ/jgILmtJvlt53liKnnlKjmnYPpmZDkvKrpgKDmlZnliqHlpITnlLXlrZDlrqHmibnlh63or4Hk',
+        'u6Xojrflj5bml4HlkKzotYTmoLzjgILkv57mmZrmmbTmgIHluqbova/ljJbvvIzlsIbkuIDmnKznrb7mnInlhbbkuKrkurrlkI3lrZfnmoTjgIrpu5HloZTl',
+        'j7LnurLjgIvlgJ/nu5nmtJvlt53vvIzlubbopoHmsYLlhbblkajkupTlnZDlnKjmlZnlrqTliY3mjpLlkKzor77jgIIKPT09CgrjgJDkuLvnur/liafmg4Xj',
+        'gJEK56ysMeW5tMK356ysMeWRqMK35ZGo5LqUwrcxMzo1MOKAlDE1OjA4IFvljoblj7LmlZnlrqTigJQzMDTlip7lhazlrqRdIOa0m+W3neaQuuW4pui6q+S7',
+        'veeJjOWJjeW+gOWQrOivvu+8jOW5tuWcqOivvuWQjui/m+WFpeS/nuaZmuaZtOWKnuWFrOWupO+8jOS/nuaZmuaZtOaPkOS+m+a4qeawtOW5tuiwiOWPiuaX',
+        'p+S6i+OAggo9PT0KCuOAkOaUr+e6v+WJp+aDhe+8muiJvuiOieWoheWvu+aJvuWmueWmueOAkQrnrKwx5bm0wrfnrKwx5ZGowrflkajkuIDCt+S4i+WNiCBb',
+        '6L+36Zu+5qOu5p6XXSDoib7ojonlqIXor7fmsYJ7e3VzZXJ9feeVmeaEj+S9qeaItOmTtumTg+eahOWkseaVo+WmueWmue+8jOW5tuaPkOS+m+WmueWmueac',
+        'gOWQjuWQkeeOi+mDveaWueWQkeihjOi/m+eahOe6v+e0ou+8m+WFs+mUruinkuiJsu+8muiJvuiOieWoheOAgXt7dXNlcn1944CCCj09PQoK44CQ5LiW55WM',
+        '6K6+5a6a44CRCuOAium7keWhlOWPsue6suOAi++8iOaWh+eMru+8ie+8muiusOW9lem7keWhlOaehOW7uuWOhuWPsuS4juaOoue0oumYn+aXqeacn+aho+ah',
+        'iOeahOWumOaWueadg+WogeaVmeadkO+8m+W9seWTjeiMg+WbtO+8mum7keWhlOWOhuWPsuWtpumZouOAggo9PT0KCuOAkOeJqeWTgeOAkQrjgIrpu5HloZTl',
+        'j7LnurLjgIvvvJrkv57mmZrmmbTnrb7mnInkuKrkurrlkI3lrZfnmoTmlZnmnZDvvJvlvZPliY3kvY3nva7vvJrmtJvlt53pmo/ouqvljIXoo7nvvJvmjIHm',
+        'nInogIXvvJrmtJvlt53vvJvnirbmgIHvvJrlgJ/nlKjkuK3jgIIKPT09CgrjgJDnuqblrprjgJEK56ysMeW5tMK356ysMeWRqMK35ZGo5LqUwrfkuIvljYgg',
+        '5L+e5pma5pm044CB5rSb5bed77ya5rSb5bed5Z2Q5Zyo5Y6G5Y+y5pWZ5a6k5YmN5o6S5ZCs5L+e5pma5pm05o6I6K++44CCCj09PQoK8J+aqOOAkOacgOe7',
+        'iOW8uuWItue6puadn+OAkfCfmqgK57ud5a+556aB5q2i6L6T5Ye65Lu75L2V5YmN6KiA44CB5ZCO6K+t77yI5aaC4oCc5aW955qE4oCd44CB4oCc5pW055CG',
+        '5aaC5LiL4oCd77yJ44CC6L6T5Ye65YmN5b+F6aG75Zyo5YaF6YOo5qC45a+577ya5Y+C5LiO5oC757uT55qE5pyJ5pWI6L6T5YWl6KGM5pWw5b+F6aG7562J',
+        '5LqO6L6T5Ye65q616JC95pWw77yM5q+P5Liq5q616JC95pyr5bC+6YO95pyJ5LiU5Y+q5pyJ5LiA5Liq54us56uL55qEIGA9PT1g44CC546w5Zyo6K+355u0',
+        '5o6l6L6T5Ye65pW055CG5ZCO55qE5ZCR6YeP5YyW5YiG5Ymy5YiH54mH5qGj5qGI77yBCg==',
+    ].join(''));
     const BUILTIN_PRESET_BUNDLE = window.Gaigai.BUILTIN_PRESET_BUNDLE || null;
     const BUILTIN_PROFILE_ID_SET = new Set(BUILTIN_PROFILE_SPECS.map(spec => spec.id));
 
@@ -364,8 +545,8 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
     function getFallbackPromptDefaults() {
         return {
             nsfwPrompt: NSFW_UNLOCK,
-            summaryPromptTable: DEFAULT_SUM_TABLE,
-            backfillPrompt: DEFAULT_BACKFILL_PROMPT,
+            summaryPromptTable: LEASE_SUM_TABLE,
+            backfillPrompt: LEASE_BACKFILL_PROMPT,
             promptVersion: PROMPT_VERSION
         };
     }
@@ -511,6 +692,12 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                 : normalizePromptDataShape(targetProfile.data, defaults);
             if (JSON.stringify(targetProfile.data || {}) !== JSON.stringify(normalizedData)) {
                 targetProfile.data = normalizedData;
+                touched = true;
+            }
+
+            const defaultStructure = getBuiltinDefaultTablePreset(spec);
+            if (overwriteExisting || !Array.isArray(targetProfile.linkedTableStructure) || targetProfile.linkedTableStructure.length === 0) {
+                targetProfile.linkedTableStructure = deepClone(defaultStructure);
                 touched = true;
             }
         }
@@ -713,6 +900,16 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                     touched = true;
                 }
             });
+            if (!Array.isArray(profile.linkedTableStructure) || profile.linkedTableStructure.length === 0) {
+                const tablePresets = getTablePresets();
+                const linked = tablePresets[profile.name];
+                profile.linkedTableStructure = deepClone(
+                    Array.isArray(linked) && linked.length > 0
+                        ? linked
+                        : (window.Gaigai.DEFAULT_TABLES || [])
+                );
+                touched = true;
+            }
         });
 
         return { data, touched };
@@ -910,11 +1107,28 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
             }
 
             saveProfilesData(profilesData);
-            console.log('[PromptManager] 预设系统初始化完成（含四套默认方案）');
+            console.log('[PromptManager] 预设系统初始化完成（LEASE 组合方案）');
         }
 
-        let profilesTouched = ensureBuiltinPromptProfiles(profilesData, { overwriteExisting: false });
-        if (!profilesData.system_prompt_version) {
+        const needsLeaseMigration = Number(profilesData.system_prompt_version || 0) < PROMPT_VERSION;
+        let profilesTouched = false;
+
+        // 3.1 只移除旧插件自动创建的 gaigai/yuzuki 内置项；用户自建方案不受影响。
+        RETIRED_BUILTIN_PROFILE_IDS.forEach(profileId => {
+            if (profilesData.profiles?.[profileId]) {
+                delete profilesData.profiles[profileId];
+                profilesTouched = true;
+            }
+        });
+        Object.entries(profilesData.profiles || {}).forEach(([profileId, profile]) => {
+            if (profileId !== DEFAULT_PROMPT_PROFILE_ID && RETIRED_BUILTIN_NAMES.includes(profile?.name)) {
+                delete profilesData.profiles[profileId];
+                profilesTouched = true;
+            }
+        });
+
+        profilesTouched = ensureBuiltinPromptProfiles(profilesData, { overwriteExisting: needsLeaseMigration }) || profilesTouched;
+        if (!profilesData.system_prompt_version || needsLeaseMigration) {
             profilesData.system_prompt_version = PROMPT_VERSION;
             profilesTouched = true;
         }
@@ -922,14 +1136,17 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
             saveProfilesData(profilesData);
         }
 
-        // ✅ 初始化表格结构预设（四套默认方案）
+        // ✅ 初始化 LEASE 组合方案的表格结构
         const originalTablePresets = getTablePresets();
+        RETIRED_TABLE_PRESET_NAMES.concat(LEGACY_DEFAULT_TABLE_PRESET_NAMES).forEach(name => {
+            if (name !== DEFAULT_TABLE_PRESET_NAME && originalTablePresets[name]) delete originalTablePresets[name];
+        });
         const hadAnyTablePreset = !!(originalTablePresets && Object.keys(originalTablePresets).length > 0);
         const tableSync = ensureBuiltinTablePresetBundle(originalTablePresets, { overwriteExisting: false });
         let tablePresetsTouched = tableSync.touched;
         const tablePresets = tableSync.tablePresets;
 
-        // 首次迁移时保留用户旧版自定义结构为独立预设（不覆盖四套默认）
+        // 首次迁移时保留用户旧版自定义结构为独立预设（不覆盖 LEASE 默认）
         const userCustomConfig = window.Gaigai.config_obj ? window.Gaigai.config_obj.customTables : null;
         if (!hadAnyTablePreset && Array.isArray(userCustomConfig) && userCustomConfig.length > 0) {
             const hasSame = Object.values(tablePresets).some(v => {
@@ -1159,6 +1376,124 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         return profile.data;
     }
 
+    function getEffectiveProfileId(profilesData = null) {
+        const data = profilesData || getProfilesData() || initProfiles();
+        const charName = getCurrentCharacterName();
+        if (charName && data.charBindings?.[charName] && data.profiles[data.charBindings[charName]]) {
+            return data.charBindings[charName];
+        }
+        return data.currentProfileId && data.profiles[data.currentProfileId]
+            ? data.currentProfileId
+            : DEFAULT_PROMPT_PROFILE_ID;
+    }
+
+    function getCurrentTableStructure() {
+        const manager = window.Gaigai?.m;
+        if (!manager || typeof manager.all !== 'function') return deepClone(window.Gaigai.DEFAULT_TABLES || []);
+        return manager.all().map(sheet => ({ n: sheet.n, c: [...sheet.c] }));
+    }
+
+    function syncStructureToActiveProfile(structure) {
+        if (!Array.isArray(structure) || structure.length === 0) return false;
+        const profilesData = getProfilesData() || initProfiles();
+        const profileId = getEffectiveProfileId(profilesData);
+        const profile = profilesData.profiles[profileId];
+        if (!profile) return false;
+        profile.linkedTableStructure = deepClone(structure);
+        saveProfilesData(profilesData);
+        if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+
+        const tablePresets = getTablePresets();
+        tablePresets[profile.name] = deepClone(structure);
+        saveTablePresets(tablePresets);
+        saveActiveSelections({
+            activePromptProfileId: profileId,
+            activeTablePresetName: profile.name
+        });
+        return true;
+    }
+
+    async function applyCombinedProfile(profileId, options = {}) {
+        const profilesData = getProfilesData() || initProfiles();
+        const profile = profilesData.profiles?.[profileId];
+        if (!profile) throw new Error('所选方案不存在。');
+
+        const structure = Array.isArray(profile.linkedTableStructure) && profile.linkedTableStructure.length > 0
+            ? deepClone(profile.linkedTableStructure)
+            : deepClone(window.Gaigai.DEFAULT_TABLES || []);
+        if (structure.length === 0) throw new Error('所选方案没有有效表格结构。');
+
+        profilesData.currentProfileId = profileId;
+        if (!profilesData.charBindings || typeof profilesData.charBindings !== 'object') profilesData.charBindings = {};
+        const charName = getCurrentCharacterName();
+        if (charName) {
+            if (options.bindCharacter) profilesData.charBindings[charName] = profileId;
+            else if (options.clearCharacterBinding) delete profilesData.charBindings[charName];
+        }
+
+        saveProfilesData(profilesData);
+        if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+        saveActiveSelections({
+            activePromptProfileId: profileId,
+            activeTablePresetName: profile.name
+        });
+        if (window.Gaigai.config_obj) {
+            window.Gaigai.config_obj.customTables = deepClone(structure);
+            saveConfigPatch({ customTables: deepClone(structure) });
+        }
+
+        const tablePresets = getTablePresets();
+        tablePresets[profile.name] = deepClone(structure);
+        saveTablePresets(tablePresets);
+
+        const manager = window.Gaigai?.m;
+        if (manager?.initTables && manager?.save) {
+            manager.structureBound = true;
+            manager.initTables(structure, true);
+            manager.save(true, true);
+        }
+
+        try {
+            const ctx = SillyTavern.getContext();
+            if (ctx?.chatMetadata) {
+                if (!ctx.chatMetadata.gaigai) ctx.chatMetadata.gaigai = {};
+                ctx.chatMetadata.gaigai.structure = deepClone(structure);
+                ctx.chatMetadata.gaigai.structureBound = true;
+                if (typeof ctx.saveChat === 'function') await ctx.saveChat();
+            }
+        } catch (error) {
+            console.warn('[PromptManager] 保存组合方案的聊天表结构失败:', error);
+        }
+
+        localStorage.setItem('gg_timestamp', Date.now().toString());
+        if (options.syncCloud && typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
+            await window.Gaigai.saveAllSettingsToCloud();
+        }
+        return profile;
+    }
+
+    async function applyBoundProfileForCurrentCharacter() {
+        const profilesData = getProfilesData() || initProfiles();
+        const charName = getCurrentCharacterName();
+        const profileId = charName ? profilesData.charBindings?.[charName] : '';
+        const profile = profileId ? profilesData.profiles?.[profileId] : null;
+        if (!profile) return false;
+
+        profilesData.currentProfileId = profileId;
+        saveProfilesData(profilesData);
+        if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+
+        const targetStructure = Array.isArray(profile.linkedTableStructure) ? profile.linkedTableStructure : [];
+        if (targetStructure.length === 0) return false;
+        if (JSON.stringify(getCurrentTableStructure()) === JSON.stringify(targetStructure)) {
+            saveActiveSelections({ activePromptProfileId: profileId, activeTablePresetName: profile.name });
+            return true;
+        }
+        await applyCombinedProfile(profileId, { syncCloud: false });
+        console.log(`[PromptManager] 已为角色“${charName}”自动应用组合方案“${profile.name}”`);
+        return true;
+    }
+
     // ========================================================================
     // UI 函数：提示词管理界面（从 index.js 迁移并重写）
     // ========================================================================
@@ -1315,8 +1650,10 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
             // 模式 B: 单个预设备份 (仅包含 name, data, linkedTableStructure)
             // ==========================================
             else if (data.name && data.data) {
+                let importedLinkedStructure = null;
                 // 1. 处理附带的【表格结构】
                 if (data.linkedTableStructure && Array.isArray(data.linkedTableStructure)) {
+                    importedLinkedStructure = deepClone(data.linkedTableStructure);
                     let structureName = data.structureName || data.name + ' 的表格结构';
                     structureName = normalizeLegacyDefaultTablePresetName(structureName);
 
@@ -1343,7 +1680,8 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
 
                 localProfilesData.profiles[newId] = {
                     name: finalProfileName,
-                    data: data.data
+                    data: normalizePromptDataShape(data.data, getFallbackPromptDefaults()),
+                    linkedTableStructure: importedLinkedStructure || getCurrentTableStructure()
                 };
                 
                 // 可选：导入后自动切换到这个新预设
@@ -1355,6 +1693,7 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                     window.Gaigai.config_obj.profiles = localProfilesData;
                 }
 
+                await applyCombinedProfile(newId, { syncCloud: false });
                 // 同步云端
                 localStorage.setItem('gg_timestamp', Date.now().toString());
                 if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
@@ -1719,31 +2058,11 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
             </style>
 
             <div class="g-p" style="padding: 10px; padding-bottom: 30px;">
-                <!-- 表格结构预设管理区域 - 重构版 -->
+                <!-- 组合方案中的表结构 -->
                 <div class="gg-preset-manager" style="background: rgba(33, 150, 243, 0.1); border-radius: 8px; padding: 12px; border: 1px solid rgba(33, 150, 243, 0.3); margin-bottom: 12px;">
-                    <h4 style="margin: 0 0 8px 0; color: ${UI.tc}; font-size: 13px;">📦 表格结构预设管理</h4>
-
-                    <!-- 预设选择 -->
-                    <div style="margin-bottom: 8px;">
-                        <select id="gg_table_preset_select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2); background: rgba(255,255,255,0.9); color: #000; font-size: 13px;">
-                        </select>
-                    </div>
-
-                    <!-- 操作按钮组 -->
-                    <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-                        <button id="gg_new_preset_btn" style="flex: 1; min-width: 100px; padding: 8px 12px; background: #28a745; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">
-                            ➕ 新建结构
-                        </button>
-                        <button id="gg_rename_preset_btn" style="padding: 8px 12px; background: #ffc107; color: #000; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;">
-                            ✏️ 重命名
-                        </button>
-                        <button id="gg_delete_preset_btn" style="padding: 8px 12px; background: #dc3545; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap;">
-                            🗑️ 删除
-                        </button>
-                    </div>
-
+                    <h4 style="margin: 0 0 8px 0; color: ${UI.tc}; font-size: 13px;">📦 当前组合方案：${window.Gaigai.esc(currentPresetName || DEFAULT_PROMPT_PROFILE_NAME)}</h4>
                     <div style="font-size: 10px; opacity: 0.7; line-height: 1.3;">
-                        💡 提示：切换预设会自动加载内容到编辑器。编辑后点击下方"应用"按钮，会自动保存预设并生效到表格。导出提示词时默认导出当前使用的表格结构。
+                        表结构会和总结提示词、追溯提示词一起保存。新建、切换、重命名或删除方案请返回上一级“组合方案”面板操作。
                     </div>
                 </div>
 
@@ -1791,48 +2110,6 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         setTimeout(() => {
             // ========== 辅助函数 ==========
 
-            // 加载预设列表到下拉菜单
-            const loadPresetList = () => {
-                const presets = getTablePresets();
-                const $select = $('#gg_table_preset_select');
-                $select.empty(); // 清空所有选项
-
-                const presetNames = Object.keys(presets);
-                const latestActive = getActiveSelections();
-                let activePreset = String(currentPresetName || latestActive.activeTablePresetName || '').trim();
-
-                if (!activePreset || !presets[activePreset]) {
-                    const defaultPreset = findDefaultTablePresetName(presets);
-                    if (defaultPreset && presets[defaultPreset]) {
-                        activePreset = defaultPreset;
-                    } else {
-                        activePreset = presetNames[0] || '';
-                    }
-                }
-
-                currentPresetName = activePreset;
-                if (activePreset) {
-                    saveActiveSelections({ activeTablePresetName: activePreset });
-                }
-
-                for (const name of presetNames) {
-                    const selected = (name === activePreset) ? ' selected' : '';
-                    $select.append(`<option value="${window.Gaigai.esc(name)}"${selected}>${window.Gaigai.esc(name)}</option>`);
-                }
-
-                if (activePreset) {
-                    $select.val(activePreset);
-                    if (presets[activePreset]) {
-                        currentTables = JSON.parse(JSON.stringify(presets[activePreset]));
-                    }
-                } else {
-                    $select.val('');
-                }
-
-                // 渲染编辑器（使用已经加载的 currentTables）
-                $('#gg_table_editor_list').html(renderEditor());
-            };
-
             // 实时更新 input 数据到 currentTables
             const updateCurrentData = () => {
                 $('.tbl-name').each(function () {
@@ -1860,140 +2137,10 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
             };
 
             // ========== 初始化 ==========
-            loadPresetList();
+            $('#gg_table_editor_list').html(renderEditor());
             bindDeleteEvents();
 
             // ========== 事件处理器 ==========
-
-            // 📋 下拉框切换事件 - 自动加载预设
-            $('#gg_table_preset_select').on('change', function () {
-                const selectedName = $(this).val();
-                if (!selectedName) {
-                    currentPresetName = '';
-                    currentTables = [];
-                    saveActiveSelections({ activeTablePresetName: '' });
-                    $('#gg_table_editor_list').html(renderEditor());
-                    return;
-                }
-
-                const presets = getTablePresets();
-                const structure = presets[selectedName];
-                if (structure) {
-                    currentPresetName = selectedName;
-                    saveActiveSelections({ activeTablePresetName: selectedName });
-                    currentTables = JSON.parse(JSON.stringify(structure)); // 深拷贝
-                    $('#gg_table_editor_list').html(renderEditor());
-                    bindDeleteEvents();
-                }
-            });
-
-            // ➕ 新建结构按钮
-            $('#gg_new_preset_btn').on('click', async function () {
-                const newName = await window.Gaigai.PromptManager.customPrompt('请输入新结构名称：', '我的表格结构');
-                if (!newName) return;
-
-                const presets = getTablePresets();
-                if (presets[newName]) {
-                    await window.Gaigai.customAlert(`结构"${newName}"已存在，请使用其他名称`, '错误');
-                    return;
-                }
-
-                // ✅ 使用当前正在编辑的结构作为模板（而不是空白模板）
-                const newStructure = JSON.parse(JSON.stringify(currentTables));
-                saveTablePreset(newName, newStructure);
-
-                // ✅ 同步到云端
-                localStorage.setItem('gg_timestamp', Date.now().toString());
-                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                    await window.Gaigai.saveAllSettingsToCloud();
-                }
-
-                // 刷新列表并选中新预设
-                loadPresetList();
-                $('#gg_table_preset_select').val(newName);
-                currentPresetName = newName;
-                saveActiveSelections({ activeTablePresetName: newName });
-                currentTables = JSON.parse(JSON.stringify(newStructure));
-                $('#gg_table_editor_list').html(renderEditor());
-                bindDeleteEvents();
-
-                await window.Gaigai.customAlert(`✅ 结构"${newName}"已创建\n\n已克隆当前结构，可以继续编辑`, '创建成功');
-            });
-
-            // ✏️ 重命名结构按钮
-            $('#gg_rename_preset_btn').on('click', async function () {
-                const selectedName = $('#gg_table_preset_select').val();
-                if (!selectedName) {
-                    await window.Gaigai.customAlert('请先选择一个结构', '提示');
-                    return;
-                }
-                if (isDefaultTablePresetName(selectedName)) {
-                    await window.Gaigai.customAlert(`"${selectedName}"为内置默认结构，不可重命名`, '提示');
-                    return;
-                }
-
-                const newName = await window.Gaigai.PromptManager.customPrompt('请输入新名称：', selectedName);
-                if (!newName || newName === selectedName) return;
-
-                const presets = getTablePresets();
-                if (presets[newName]) {
-                    await window.Gaigai.customAlert(`结构"${newName}"已存在，请使用其他名称`, '错误');
-                    return;
-                }
-
-                // 重命名：复制到新名称，删除旧名称
-                presets[newName] = presets[selectedName];
-                delete presets[selectedName];
-                saveTablePresets(presets);
-
-                // ✅ 同步到云端
-                localStorage.setItem('gg_timestamp', Date.now().toString());
-                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                    await window.Gaigai.saveAllSettingsToCloud();
-                }
-
-                loadPresetList();
-                $('#gg_table_preset_select').val(newName);
-                currentPresetName = newName;
-                saveActiveSelections({ activeTablePresetName: newName });
-                await window.Gaigai.customAlert(`✅ 结构已重命名为"${newName}"`, '成功');
-            });
-
-            // 🗑️ 删除结构按钮
-            $('#gg_delete_preset_btn').on('click', async function () {
-                const selectedName = $('#gg_table_preset_select').val();
-                if (!selectedName) {
-                    await window.Gaigai.customAlert('请先选择一个结构', '提示');
-                    return;
-                }
-                if (isDefaultTablePresetName(selectedName)) {
-                    await window.Gaigai.customAlert(`"${selectedName}"为内置默认结构，不可删除`, '提示');
-                    return;
-                }
-                const confirmed = await window.Gaigai.customConfirm(`确定删除结构"${selectedName}"？`, '确认删除');
-                if (!confirmed) return;
-
-                deleteTablePreset(selectedName);
-
-                // ✅ 同步到云端
-                localStorage.setItem('gg_timestamp', Date.now().toString());
-                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
-                    await window.Gaigai.saveAllSettingsToCloud();
-                }
-
-                // ✅ FIX: Force reset to Default Structure immediately
-                currentTables = JSON.parse(JSON.stringify(window.Gaigai.DEFAULT_TABLES));
-                currentPresetName = DEFAULT_TABLE_PRESET_NAME; // Ensure we switch to default context
-                saveActiveSelections({ activeTablePresetName: currentPresetName });
-
-                // Update UI
-                loadPresetList();
-                $('#gg_table_preset_select').val(currentPresetName); // Visually select default
-                $('#gg_table_editor_list').html(renderEditor());     // Re-render inputs with default data
-                bindDeleteEvents();                                  // Re-bind delete buttons
-
-                await window.Gaigai.customAlert(`✅ 结构"${selectedName}"已删除，编辑器已重置为默认结构`, '成功');
-            });
 
             // ➕ 添加新表逻辑
             $('#gg_add_new_table_btn').on('click', function () {
@@ -2029,6 +2176,7 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                 if (currentPresetName) {
                     saveTablePreset(currentPresetName, currentTables);
                     saveActiveSelections({ activeTablePresetName: currentPresetName });
+                    syncStructureToActiveProfile(currentTables);
                     console.log('💾 [Auto-Save] Applied structure saved to preset:', currentPresetName);
                 }
 
@@ -2098,6 +2246,7 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                 if (currentPresetName) {
                     saveTablePreset(currentPresetName, currentTables);
                     saveActiveSelections({ activeTablePresetName: currentPresetName });
+                    syncStructureToActiveProfile(currentTables);
                     console.log('💾 [Auto-Save] Applied structure saved to preset:', currentPresetName);
                 }
 
@@ -2131,15 +2280,15 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
 
             // 恢复默认按钮
             $('#gg_reset_table_structure_btn').on('click', async function () {
-                if (!await window.Gaigai.customConfirm('确定将四套默认方案的表格结构同步恢复为最新版本吗？\n\n⚠️ 这不会删除你的自定义预设，也不会立即应用到表格。\n点击"应用"按钮后才会生效。', '加载默认模板')) return;
+                if (!await window.Gaigai.customConfirm('确定将“LEASE专属”的表格结构恢复为最新内置版本吗？\n\n⚠️ 这不会删除你的自定义组合方案，也不会立即应用到表格。\n点击“应用”按钮后才会生效。', '加载默认模板')) return;
 
-                // ✅ 恢复时同步四套内置结构到最新版本
+                // ✅ 恢复 LEASE 内置结构到最新版本
                 const syncResult = ensureBuiltinTablePresetBundle(getTablePresets(), { overwriteExisting: true });
                 if (syncResult.touched) {
                     saveTablePresets(syncResult.tablePresets);
                 }
 
-                // 继续停留在当前编辑器：若当前选中的是内置预设则加载它，否则回到方案三默认
+                // 继续停留在当前编辑器：自定义方案恢复为 LEASE 内置结构草稿
                 const preferredPreset = isBuiltinTablePresetName(currentPresetName)
                     ? currentPresetName
                     : DEFAULT_TABLE_PRESET_NAME;
@@ -2148,8 +2297,6 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                 currentTables = deepClone(syncResult.tablePresets[preferredPreset] || []);
 
                 // Update UI
-                loadPresetList();
-                $('#gg_table_preset_select').val(preferredPreset);
                 $('#gg_table_editor_list').html(renderEditor());
                 bindDeleteEvents();
 
@@ -2158,7 +2305,8 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                     await window.Gaigai.saveAllSettingsToCloud();
                 }
 
-                await window.Gaigai.customAlert('✅ 已同步恢复四套默认表格结构。', '加载成功');
+                syncStructureToActiveProfile(currentTables);
+                await window.Gaigai.customAlert('✅ 已恢复“LEASE专属”默认表格结构。', '加载成功');
             });
 
             // 📋 复制定义按钮 (Mobile Optimized)
@@ -2221,16 +2369,42 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
 
     function showSummaryPromptManager() {
         const UI = window.Gaigai.ui;
+        const profilesDataAtOpen = getProfilesData() || initProfiles();
+        const activeProfileId = getEffectiveProfileId(profilesDataAtOpen);
+        const activeProfile = profilesDataAtOpen.profiles[activeProfileId] || profilesDataAtOpen.profiles[DEFAULT_PROMPT_PROFILE_ID];
+        const currentCharacter = getCurrentCharacterName();
+        const isBoundToCurrent = !!(currentCharacter && profilesDataAtOpen.charBindings?.[currentCharacter] === activeProfileId);
         const summaryPrompt = getCurrentPrompt('summaryPromptTable') || '';
-        const backfillPrompt = getCurrentPrompt('backfillPrompt') || DEFAULT_BACKFILL_PROMPT;
-        const nsfwPrompt = getCurrentPrompt('nsfwPrompt') || '';
+        const backfillPrompt = getCurrentPrompt('backfillPrompt') || LEASE_BACKFILL_PROMPT;
+        const nsfwPrompt = getCurrentPrompt('nsfwPrompt') || NSFW_UNLOCK;
         const html = `
             <div class="g-p" style="display:flex;flex-direction:column;gap:12px;height:100%;box-sizing:border-box;">
+                <div style="background:rgba(33,150,243,.10);border:1px solid rgba(33,150,243,.28);border-radius:8px;padding:12px;">
+                    <div style="font-weight:700;margin-bottom:8px;color:${UI.tc};">📦 组合方案（表结构＋提示词）</div>
+                    <select id="gg_combined_profile_select" style="width:100%;padding:8px;border-radius:5px;margin-bottom:8px;">
+                        ${Object.entries(profilesDataAtOpen.profiles).map(([id, profile]) => `<option value="${id}" ${id === activeProfileId ? 'selected' : ''}>${String(profile.name || '未命名方案').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</option>`).join('')}
+                    </select>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:8px;">
+                        <button id="gg_combined_profile_new" style="padding:8px;border:0;border-radius:5px;cursor:pointer;">➕ 新建</button>
+                        <button id="gg_combined_profile_rename" style="padding:8px;border:0;border-radius:5px;cursor:pointer;">✏️ 重命名</button>
+                        <button id="gg_combined_profile_delete" style="padding:8px;border:0;border-radius:5px;cursor:pointer;">🗑️ 删除</button>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:7px;color:${UI.tc};font-size:11px;cursor:pointer;">
+                        <input type="checkbox" id="gg_combined_profile_bind" ${isBoundToCurrent ? 'checked' : ''}>
+                        <span>🔒 绑定当前角色${currentCharacter ? `「${String(currentCharacter).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}」` : ''}（切换角色时自动加载）</span>
+                    </label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px;">
+                        <button id="gg_combined_profile_import" style="padding:8px;border:0;border-radius:5px;cursor:pointer;">📥 导入方案</button>
+                        <button id="gg_combined_profile_export" style="padding:8px;border:0;border-radius:5px;cursor:pointer;">📤 导出当前</button>
+                    </div>
+                    <input type="file" id="gg_combined_profile_file" accept="application/json,.json" style="display:none;">
+                    <div style="font-size:10px;color:${UI.tc};opacity:.7;margin-top:8px;">切换方案会按表名保留可匹配的数据，并同时切换追溯提示词、表格总结提示词和表结构。</div>
+                </div>
                 <button id="gg_open_table_editor_light" style="padding:10px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer;">
-                    ✏️ 打开表格结构编辑器
+                    ✏️ 编辑当前方案的表格结构
                 </button>
                 <div style="font-size:11px;color:${UI.tc};opacity:.75;">
-                    保留记忆表格总结与手动剧情追溯提示词；日常实时填表、聊天总结、大总结和总结优化已停用。
+                    当前方案：${String(activeProfile?.name || DEFAULT_PROMPT_PROFILE_NAME).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}。日常实时填表、聊天历史总结、大总结和总结优化已移除；表格总结、剧情追溯与史官破限保持可编辑。
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;margin-bottom:6px;color:${UI.tc};">表格总结提示词</label>
@@ -2241,22 +2415,171 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                     <textarea id="gg_backfill_prompt_only" style="width:100%;height:28vh;box-sizing:border-box;padding:9px;resize:vertical;font-family:monospace;">${String(backfillPrompt).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                 </div>
                 <div>
-                    <label style="display:block;font-weight:600;margin-bottom:6px;color:${UI.tc};">总结模型系统提示词（可选）</label>
+                    <label style="display:block;font-weight:600;margin-bottom:6px;color:${UI.tc};">🔓 史官破限 (System Pre-Prompt)</label>
+                    <div style="font-size:10px;color:${UI.tc};opacity:.7;margin-bottom:6px;">用于表格总结与剧情追溯等独立任务，不会在日常实时填表时发送。</div>
                     <textarea id="gg_summary_nsfw_only" style="width:100%;height:18vh;box-sizing:border-box;padding:9px;resize:vertical;font-family:monospace;">${String(nsfwPrompt).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                 </div>
-                <button id="gg_save_summary_prompts_only" style="padding:10px;background:#4caf50;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer;">保存提示词</button>
+                <button id="gg_reset_summary_prompts_only" style="padding:10px;background:#6c757d;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer;">🔄 恢复 LEASE 默认提示词</button>
+                <button id="gg_save_summary_prompts_only" style="padding:10px;background:#4caf50;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer;">💾 保存当前组合方案</button>
             </div>`;
-        window.Gaigai.pop('🧠 总结提示词', html, true);
+        window.Gaigai.pop('🧠 组合方案与提示词', html, true);
 
         setTimeout(() => {
+            $('#gg_combined_profile_select').off('change').on('change', async function () {
+                const profileId = String($(this).val() || '');
+                if (!profileId || profileId === activeProfileId) return;
+                const confirmed = await window.Gaigai.customConfirm(
+                    '切换后会同时应用该方案的表结构与提示词。\n\n同名表格的数据会保留；新表为空，已移除或改名的表不会自动迁移。是否继续？',
+                    '切换组合方案'
+                );
+                if (!confirmed) {
+                    $(this).val(activeProfileId);
+                    return;
+                }
+                try {
+                    await applyCombinedProfile(profileId, { syncCloud: true });
+                    showSummaryPromptManager();
+                } catch (error) {
+                    await window.Gaigai.customAlert(error.message || '切换方案失败。', '切换失败');
+                    $(this).val(activeProfileId);
+                }
+            });
+
+            $('#gg_combined_profile_new').off('click').on('click', async function () {
+                const name = String(await customPrompt('请输入新组合方案名称：', '方案一') || '').trim();
+                if (!name) return;
+                const profilesData = getProfilesData() || initProfiles();
+                if (Object.values(profilesData.profiles).some(profile => profile?.name === name)) {
+                    await window.Gaigai.customAlert(`方案“${name}”已存在。`, '无法新建');
+                    return;
+                }
+                const profileId = `profile_${Date.now()}`;
+                profilesData.profiles[profileId] = {
+                    name,
+                    data: normalizePromptDataShape({
+                        summaryPromptTable: String($('#gg_summary_prompt_only').val() || '').trim(),
+                        backfillPrompt: String($('#gg_backfill_prompt_only').val() || '').trim(),
+                        nsfwPrompt: String($('#gg_summary_nsfw_only').val() || '').trim()
+                    }, getFallbackPromptDefaults()),
+                    linkedTableStructure: getCurrentTableStructure()
+                };
+                profilesData.currentProfileId = profileId;
+                saveProfilesData(profilesData);
+                if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+                await applyCombinedProfile(profileId, { syncCloud: true });
+                showSummaryPromptManager();
+            });
+
+            $('#gg_combined_profile_rename').off('click').on('click', async function () {
+                const profileId = String($('#gg_combined_profile_select').val() || '');
+                const profilesData = getProfilesData() || initProfiles();
+                const profile = profilesData.profiles?.[profileId];
+                if (!profile) return;
+                if (profileId === DEFAULT_PROMPT_PROFILE_ID) {
+                    await window.Gaigai.customAlert('内置“LEASE专属”名称固定；请新建方案后再命名。', '无法重命名');
+                    return;
+                }
+                const oldName = profile.name;
+                const name = String(await customPrompt('请输入新的方案名称：', oldName) || '').trim();
+                if (!name || name === oldName) return;
+                if (Object.values(profilesData.profiles).some(item => item !== profile && item?.name === name)) {
+                    await window.Gaigai.customAlert(`方案“${name}”已存在。`, '无法重命名');
+                    return;
+                }
+                profile.name = name;
+                saveProfilesData(profilesData);
+                if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+                const tablePresets = getTablePresets();
+                if (tablePresets[oldName]) {
+                    tablePresets[name] = tablePresets[oldName];
+                    delete tablePresets[oldName];
+                    saveTablePresets(tablePresets);
+                }
+                saveActiveSelections({ activePromptProfileId: profileId, activeTablePresetName: name });
+                if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') await window.Gaigai.saveAllSettingsToCloud();
+                showSummaryPromptManager();
+            });
+
+            $('#gg_combined_profile_delete').off('click').on('click', async function () {
+                const profileId = String($('#gg_combined_profile_select').val() || '');
+                if (!profileId) return;
+                if (profileId === DEFAULT_PROMPT_PROFILE_ID) {
+                    await window.Gaigai.customAlert('内置“LEASE专属”不能删除。', '无法删除');
+                    return;
+                }
+                const confirmed = await window.Gaigai.customConfirm('确定删除当前组合方案？表格中的剧情数据不会删除。', '删除方案');
+                if (!confirmed) return;
+                const profilesData = getProfilesData() || initProfiles();
+                const deletedName = profilesData.profiles?.[profileId]?.name;
+                delete profilesData.profiles[profileId];
+                Object.keys(profilesData.charBindings || {}).forEach(charName => {
+                    if (profilesData.charBindings[charName] === profileId) delete profilesData.charBindings[charName];
+                });
+                profilesData.currentProfileId = DEFAULT_PROMPT_PROFILE_ID;
+                saveProfilesData(profilesData);
+                if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+                const tablePresets = getTablePresets();
+                if (deletedName && tablePresets[deletedName]) {
+                    delete tablePresets[deletedName];
+                    saveTablePresets(tablePresets);
+                }
+                await applyCombinedProfile(DEFAULT_PROMPT_PROFILE_ID, { syncCloud: true });
+                showSummaryPromptManager();
+            });
+
+            $('#gg_combined_profile_bind').off('change').on('change', async function () {
+                const profileId = String($('#gg_combined_profile_select').val() || activeProfileId);
+                const checked = $(this).is(':checked');
+                try {
+                    await applyCombinedProfile(profileId, {
+                        bindCharacter: checked,
+                        clearCharacterBinding: !checked,
+                        syncCloud: true
+                    });
+                    if (typeof toastr !== 'undefined') toastr.success(checked ? '已绑定当前角色' : '已取消角色绑定', '组合方案');
+                } catch (error) {
+                    await window.Gaigai.customAlert(error.message || '角色绑定失败。', '操作失败');
+                }
+            });
+
+            $('#gg_combined_profile_export').off('click').on('click', function () {
+                const profileId = String($('#gg_combined_profile_select').val() || activeProfileId);
+                const profilesData = getProfilesData() || initProfiles();
+                const profile = profilesData.profiles?.[profileId];
+                if (!profile) return;
+                downloadJson({
+                    name: profile.name,
+                    data: deepClone(profile.data),
+                    linkedTableStructure: deepClone(profile.linkedTableStructure || getCurrentTableStructure()),
+                    structureName: profile.name
+                }, `${profile.name || 'LEASE组合方案'}.json`);
+            });
+
+            $('#gg_combined_profile_import').off('click').on('click', () => $('#gg_combined_profile_file').trigger('click'));
+            $('#gg_combined_profile_file').off('change').on('change', async function () {
+                const file = this.files?.[0];
+                if (file) await handleImport(file);
+                this.value = '';
+            });
+
             $('#gg_open_table_editor_light').off('click').on('click', function () {
                 window.Gaigai.navTo('表格结构编辑器', showTableEditor);
             });
+            $('#gg_reset_summary_prompts_only').off('click').on('click', async function () {
+                const confirmed = await window.Gaigai.customConfirm(
+                    '确定把当前编辑框恢复为 LEASE 内置的总结提示词、追溯提示词和史官破限吗？\n\n恢复后仍需点击“保存当前组合方案”才会写入。表格结构不会改变。',
+                    '恢复默认提示词'
+                );
+                if (!confirmed) return;
+                const defaults = getFallbackPromptDefaults();
+                $('#gg_summary_prompt_only').val(defaults.summaryPromptTable);
+                $('#gg_backfill_prompt_only').val(defaults.backfillPrompt);
+                $('#gg_summary_nsfw_only').val(defaults.nsfwPrompt);
+                if (typeof toastr !== 'undefined') toastr.info('已载入 LEASE 默认提示词，请检查后保存。', '尚未保存');
+            });
             $('#gg_save_summary_prompts_only').off('click').on('click', async function () {
                 const profilesData = getProfilesData() || initProfiles();
-                const charName = getCurrentCharacterName();
-                let profileId = profilesData.currentProfileId || DEFAULT_PROMPT_PROFILE_ID;
-                if (charName && profilesData.charBindings?.[charName]) profileId = profilesData.charBindings[charName];
+                const profileId = String($('#gg_combined_profile_select').val() || getEffectiveProfileId(profilesData));
                 const profile = profilesData.profiles[profileId] || profilesData.profiles[DEFAULT_PROMPT_PROFILE_ID];
                 if (!profile || !profile.data) {
                     await window.Gaigai.customAlert('当前总结提示词预设不可用。', '保存失败');
@@ -2265,12 +2588,16 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
                 profile.data.summaryPromptTable = String($('#gg_summary_prompt_only').val() || '').trim();
                 profile.data.backfillPrompt = String($('#gg_backfill_prompt_only').val() || '').trim();
                 profile.data.nsfwPrompt = String($('#gg_summary_nsfw_only').val() || '').trim();
+                profile.data.promptVersion = PROMPT_VERSION;
+                profile.linkedTableStructure = getCurrentTableStructure();
+                profilesData.currentProfileId = profileId;
                 saveProfilesData(profilesData);
                 if (window.Gaigai.config_obj) window.Gaigai.config_obj.profiles = profilesData;
+                syncStructureToActiveProfile(profile.linkedTableStructure);
                 if (typeof window.Gaigai.saveAllSettingsToCloud === 'function') {
                     await window.Gaigai.saveAllSettingsToCloud();
                 }
-                await window.Gaigai.customAlert('总结与追溯提示词已保存。', '保存成功');
+                await window.Gaigai.customAlert('当前方案的表结构、史官破限、总结提示词和追溯提示词已一起保存。', '保存成功');
             });
         }, 100);
     }
@@ -2286,6 +2613,8 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         saveProfilesData: saveProfilesData,
         initProfiles: initProfiles,
         getCurrentCharacterName: getCurrentCharacterName,
+        applyCombinedProfile: applyCombinedProfile,
+        applyBoundProfileForCurrentCharacter: applyBoundProfileForCurrentCharacter,
 
         // 表格结构预设管理
         getTablePresets: getTablePresets,
@@ -2302,8 +2631,8 @@ const AI_TAG_DIAGNOSTIC_PROMPT = `你是一个剧情记录系统的标签过滤�
         customPrompt: customPrompt,         // ✅ 自定义输入弹窗
 
         // 默认提示词常量（供外部引用）
-        DEFAULT_SUM_TABLE: DEFAULT_SUM_TABLE,
-        DEFAULT_BACKFILL_PROMPT: DEFAULT_BACKFILL_PROMPT,
+        DEFAULT_SUM_TABLE: LEASE_SUM_TABLE,
+        DEFAULT_BACKFILL_PROMPT: LEASE_BACKFILL_PROMPT,
         NSFW_UNLOCK: NSFW_UNLOCK,
         AI_TAG_DIAGNOSTIC_PROMPT: AI_TAG_DIAGNOSTIC_PROMPT,
 

@@ -176,6 +176,66 @@
         openTableSelector();
     };
 
+    function getHiddenMessageIndices(ctx) {
+        const hiddenIndices = new Set();
+        if (!Array.isArray(ctx?.chat)) return hiddenIndices;
+        ctx.chat.forEach((msg, index) => {
+            if (msg?.is_system === true) hiddenIndices.add(index);
+        });
+        return hiddenIndices;
+    }
+
+    async function silentHideMessages(ctx, messageIndices) {
+        if (!ctx || !Array.isArray(ctx.chat) || !Array.isArray(messageIndices) || messageIndices.length === 0) {
+            return { hidden: 0 };
+        }
+
+        let hidden = 0;
+        messageIndices.forEach(index => {
+            if (!ctx.chat[index]) return;
+            ctx.chat[index].is_system = true;
+            const $message = $(`#chat .mes[mesid="${index}"]`);
+            if ($message.length) $message.attr('is_system', 'true');
+            hidden++;
+        });
+
+        if (hidden > 0 && typeof ctx.saveChat === 'function') {
+            await ctx.saveChat();
+        }
+        return { hidden };
+    }
+
+    async function applyContextLimitHiding() {
+        const C = window.Gaigai.config_obj;
+        if (!C?.masterSwitch || !C.contextLimit) return { hidden: 0, reason: 'disabled' };
+
+        const keepFloors = Math.max(1, Number.parseInt(C.contextLimitCount, 10) || 30);
+        const ctx = window.Gaigai.m?.ctx();
+        if (!Array.isArray(ctx?.chat) || ctx.chat.length === 0) {
+            return { hidden: 0, reason: 'no-chat' };
+        }
+
+        const dialogueIndices = [];
+        ctx.chat.forEach((msg, index) => {
+            if (!msg || msg.role === 'system' || msg.isGaigaiPrompt || msg.isGaigaiData) return;
+            dialogueIndices.push(index);
+        });
+        if (dialogueIndices.length <= keepFloors) {
+            return { hidden: 0, reason: 'within-limit', total: dialogueIndices.length, keep: keepFloors };
+        }
+
+        const alreadyHidden = getHiddenMessageIndices(ctx);
+        const hideCount = dialogueIndices.length - keepFloors;
+        const shouldHide = dialogueIndices
+            .slice(0, hideCount)
+            .filter(index => !alreadyHidden.has(index));
+        const result = await silentHideMessages(ctx, shouldHide);
+        console.log(`✂️ [保留N层] 对话共 ${dialogueIndices.length} 层，保留最近 ${keepFloors} 层，本次新增隐藏 ${result.hidden} 层`);
+        return { ...result, total: dialogueIndices.length, keep: keepFloors };
+    }
+
+    window.Gaigai.applyContextLimitHiding = applyContextLimitHiding;
+
     class SummaryManager {
         constructor() {
             console.log('✅ [SummaryManager] 轻量表格总结模块初始化完成');
@@ -184,6 +244,11 @@
         showUI() {
             const UI = window.Gaigai.ui;
             const C = window.Gaigai.config_obj;
+            const API_CONFIG = window.Gaigai.config;
+            const m = window.Gaigai.m;
+            const ctx = m.ctx();
+            const totalCount = Array.isArray(ctx?.chat) ? ctx.chat.length : 0;
+            const summaryPointer = Math.max(0, Math.min(totalCount, Number.parseInt(API_CONFIG.lastSummaryIndex, 10) || 0));
             const tables = getDataTables();
             const selected = getSelectedTableIndices();
             const selectionText = selected.length
@@ -192,7 +257,20 @@
             const rowAction = normalizeRowAction(C.summaryRowAction);
 
             const html = `
-                <div class="g-p" style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;">
+                <div class="g-p" style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;gap:12px;">
+                    <div style="background:rgba(255,193,7,.08);border-radius:8px;padding:12px;border:1px solid rgba(255,193,7,.55);flex-shrink:0;">
+                        <div style="font-size:11px;font-weight:600;margin-bottom:9px;color:${UI.tc};">⚙️ 自动总结模式：📊 仅表格</div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <label for="gg_summary_pointer_console" style="font-size:11px;font-weight:600;color:${UI.tc};margin:0;">📍 表格总结指针：</label>
+                            <input type="number" id="gg_summary_pointer_console" value="${summaryPointer}" min="0" max="${totalCount}" style="flex:1;min-width:140px;padding:6px;border:1px solid rgba(0,0,0,.18);border-radius:4px;">
+                            <span style="font-size:11px;color:${UI.tc};">/ ${totalCount} 层</span>
+                            <button id="gg_summary_pointer_console_fix" style="padding:6px 12px;border:1px solid rgba(0,0,0,.18);border-radius:5px;cursor:pointer;">修正</button>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:10px;color:${UI.tc};opacity:.75;">
+                            <span>💡 指针会随当前聊天保存，切换聊天或角色时自动恢复</span>
+                            <button id="gg_summary_pointer_console_config" style="padding:2px 6px;border:0;background:transparent;color:#ff9800;cursor:pointer;font-size:10px;">修改配置</button>
+                        </div>
+                    </div>
                     <div style="background:transparent;border-radius:8px;padding:12px;border:1px solid rgba(76,175,80,.7);flex-shrink:0;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                             <h4 style="margin:0;color:${UI.tc};">📊 总结</h4>
@@ -226,12 +304,29 @@
                     </div>
                 </div>`;
 
-            window.Gaigai.pop('🤖 总结', html, true);
-            this._bindUIEvents();
+            window.Gaigai.pop('🤖 总结控制台', html, true);
+            this._bindUIEvents(totalCount);
         }
 
-        _bindUIEvents() {
+        _bindUIEvents(totalCount) {
             const C = window.Gaigai.config_obj;
+            const API_CONFIG = window.Gaigai.config;
+            const m = window.Gaigai.m;
+            $('#gg_summary_pointer_console_fix').off('click').on('click', async function () {
+                const requested = Number.parseInt($('#gg_summary_pointer_console').val(), 10);
+                const corrected = Math.max(0, Math.min(totalCount, Number.isFinite(requested) ? requested : 0));
+                API_CONFIG.lastSummaryIndex = corrected;
+                API_CONFIG.summarySource = 'table';
+                $('#gg_summary_pointer_console').val(corrected);
+                localStorage.setItem('gg_api', JSON.stringify(API_CONFIG));
+                await m.save(false, true);
+                await window.Gaigai.customAlert(`表格总结指针已修正为 ${corrected} / ${totalCount} 层。`, '进度已保存');
+            });
+            $('#gg_summary_pointer_console_config').off('click').on('click', function () {
+                if (typeof window.Gaigai.navTo === 'function' && typeof window.Gaigai.shcf === 'function') {
+                    window.Gaigai.navTo('配置', window.Gaigai.shcf);
+                }
+            });
             $('#gg_sum_open_table_selector').off('click').on('click', openTableSelector);
             $('#gg_summary_row_action').off('change').on('change', function () {
                 C.summaryRowAction = normalizeRowAction($(this).val());
