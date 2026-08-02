@@ -1,5 +1,5 @@
 ﻿// ========================================================================
-// LEASE Memory Context v3.3.2
+// LEASE Memory Context v3.3.3
 // SillyTavern 记忆管理系统 - 提供表格化记忆、表格总结与独立向量检索
 // ========================================================================
 (function () {
@@ -16,7 +16,7 @@
     }
     window.GaigaiLoaded = true;
 
-    console.log('🚀 LEASE Memory Context v3.3.2 启动');
+    console.log('🚀 LEASE Memory Context v3.3.3 启动');
 
     // ===== 防止配置被后台同步覆盖的标志 =====
     window.isEditingConfig = false;
@@ -25,7 +25,7 @@
     let isRestoringSettings = false;
 
     // ==================== 全局常量定义 ====================
-    const V = 'v3.3.2';
+    const V = 'v3.3.3';
     const SK = 'gg_data';              // 数据存储键
     const UK = 'gg_ui';                // UI配置存储键
     const AK = 'gg_api';               // API配置存储键
@@ -11490,11 +11490,15 @@
 
         const targetEndIndex = Math.min(lastIndex + interval, currentCount);
         if (!C.autoBackfillPrompt) {
-            const confirmed = await customConfirm(
-                `已积累 ${pendingCount} 层未追溯内容。\n\n现在批量填表第 ${lastIndex}～${targetEndIndex} 层吗？`,
-                '自动批量填表'
-            );
-            if (!confirmed) return;
+            const decision = await showAutoTaskConfirm('backfill', currentCount, lastIndex, threshold);
+            if (decision.action !== 'confirm') return;
+            if (decision.postpone > 0) {
+                API_CONFIG.lastBackfillIndex = currentCount - threshold + decision.postpone;
+                localStorage.setItem(AK, JSON.stringify(API_CONFIG));
+                await m.save(false, true);
+                console.log(`⏰ [自动批量填表] 已按用户选择顺延 ${decision.postpone} 层`);
+                return;
+            }
         }
 
         window.Gaigai.isAutoBackfillRunning = true;
@@ -11539,8 +11543,15 @@
         if ($('.g-ov').length > 0) return;
 
         if (!C.autoSummaryPrompt) {
-            const confirmed = await customConfirm('已达到自动总结间隔。是否总结当前记忆表格？', '自动总结');
-            if (!confirmed) return;
+            const decision = await showAutoTaskConfirm('summary', currentCount, lastIndex, interval + delay);
+            if (decision.action !== 'confirm') return;
+            if (decision.postpone > 0) {
+                API_CONFIG.lastSummaryIndex = currentCount - (interval + delay) + decision.postpone;
+                localStorage.setItem(AK, JSON.stringify(API_CONFIG));
+                await m.save(false, true);
+                console.log(`⏰ [自动总结] 已按用户选择顺延 ${decision.postpone} 层`);
+                return;
+            }
         }
 
         const selectedTables = Array.isArray(C.autoSummaryTargetTables) && C.autoSummaryTargetTables.length > 0

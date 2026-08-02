@@ -117,55 +117,96 @@
         return window.Gaigai.VM.syncSummaryToBook(true);
     }
 
+    function archiveSummaryRowsAfterVectorization() {
+        const m = window.Gaigai.m;
+        const summaryTableIndex = Array.isArray(m?.s) ? m.s.length - 1 : -1;
+        const summarySheet = summaryTableIndex >= 0 ? m.get(summaryTableIndex) : null;
+        if (!summarySheet || !Array.isArray(summarySheet.r) || summarySheet.r.length === 0) return 0;
+
+        const summarized = window.Gaigai.summarizedRows || {};
+        const archived = new Set(Array.isArray(summarized[summaryTableIndex]) ? summarized[summaryTableIndex] : []);
+        let archivedCount = 0;
+        summarySheet.r.forEach((_, rowIndex) => {
+            if (archived.has(rowIndex)) return;
+            window.Gaigai.markAsSummarized(summaryTableIndex, rowIndex);
+            archivedCount++;
+        });
+        return archivedCount;
+    }
+
     function openTableSelector() {
-        if (document.getElementById('gg-summary-table-selector')) return;
+        if (document.getElementById('gg-sum-table-selector-overlay')) return;
 
         const C = window.Gaigai.config_obj;
-        const UI = window.Gaigai.ui;
         const tables = getDataTables();
         const selected = new Set(getSelectedTableIndices());
-        const overlay = $('<div id="gg-summary-table-selector"></div>').css({
-            position: 'fixed', inset: 0, zIndex: 10000020,
-            background: 'rgba(0,0,0,0.6)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', padding: '16px'
-        });
-        const box = $('<div></div>').css({
-            width: 'min(520px, 92vw)', maxHeight: '80vh', overflow: 'auto',
-            background: UI.c, color: UI.tc, borderRadius: '8px', padding: '16px',
-            boxShadow: '0 6px 24px rgba(0,0,0,0.35)'
-        });
+        const overlay = $('<div>', { id: 'gg-sum-table-selector-overlay' });
+        document.body.appendChild(overlay[0]);
+        overlay[0].setAttribute('style', `
+            position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;
+            width:100vw!important;height:100dvh!important;background:rgba(0,0,0,.5)!important;
+            z-index:2147483647!important;display:flex!important;align-items:center!important;
+            justify-content:center!important;overflow-y:auto!important;padding:10px!important;
+            margin:0!important;border:none!important;transform:none!important;
+        `.replace(/\s+/g, ' ').trim());
 
-        box.append('<h3 style="margin:0 0 12px;">🎯 选择要总结的表格</h3>');
-        const list = $('<div></div>').css({ display: 'grid', gap: '8px' });
-        tables.forEach((sheet, index) => {
+        const modal = $('<div>').addClass('gg-custom-modal');
+        const cards = tables.map((sheet, index) => {
+            const name = window.Gaigai.esc(sheet.n || `表${index}`);
             const rowCount = Array.isArray(sheet.r) ? sheet.r.length : 0;
-            const label = $('<label></label>').css({
-                display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
-                padding: '9px', border: '1px solid rgba(127,127,127,0.25)', borderRadius: '6px'
-            });
-            const checkbox = $(`<input type="checkbox" data-table-index="${index}">`).prop('checked', selected.has(index));
-            label.append(checkbox, `<span style="flex:1;">${sheet.n || `表${index}`}</span>`, `<span style="opacity:.7;font-size:11px;">${rowCount}行</span>`);
-            list.append(label);
-        });
-        box.append(list);
+            return `
+                <div class="gg-choice-card" title="${name}">
+                    <input type="checkbox" class="gg_sum_table_checkbox_modal" data-table-index="${index}" ${selected.has(index) ? 'checked' : ''}>
+                    <span class="gg-choice-name">${name}</span>
+                    <span class="gg-choice-badge" style="opacity:.7;">${rowCount}行</span>
+                </div>`;
+        }).join('');
+        modal.html(`
+            <span id="gg_sum_modal_close_btn" style="position:absolute;right:20px;top:20px;cursor:pointer;font-size:24px;line-height:1;opacity:.7;">&times;</span>
+            <h3 style="margin:0 0 15px 0;">🎯 选择表格</h3>
+            <div style="margin-bottom:15px;">
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <button type="button" id="gg_sum_modal_select_all" style="flex:1;padding:8px;border-radius:4px;cursor:pointer;font-size:11px;">全选</button>
+                    <button type="button" id="gg_sum_modal_deselect_all" style="flex:1;padding:8px;border-radius:4px;cursor:pointer;font-size:11px;">全不选</button>
+                </div>
+                <div class="gg-choice-grid" style="max-height:min(400px,50vh);overflow-y:auto;">${cards}</div>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button type="button" id="gg_sum_modal_cancel" style="flex:1;padding:10px;border-radius:4px;cursor:pointer;font-size:12px;">取消</button>
+                <button type="button" id="gg_sum_modal_save" style="flex:1;padding:10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;">确定保存</button>
+            </div>`);
+        overlay.append(modal);
 
-        const actions = $('<div></div>').css({ display: 'flex', gap: '8px', marginTop: '14px' });
-        const cancel = $('<button type="button">取消</button>').css({ flex: 1, padding: '8px' });
-        const save = $('<button type="button">保存选择</button>').css({ flex: 1, padding: '8px', background: '#4caf50', color: '#fff', border: 0, borderRadius: '4px' });
-        cancel.on('click', () => overlay.remove());
-        save.on('click', () => {
-            C.manualSummaryTargetTables = list.find('input:checked').map(function () {
+        const close = () => {
+            $(document).off('keydown.gg_sum_modal');
+            overlay.remove();
+        };
+        $('#gg_sum_modal_close_btn, #gg_sum_modal_cancel').on('click', close);
+        $('#gg_sum_modal_select_all').on('click', () => $('.gg_sum_table_checkbox_modal').prop('checked', true));
+        $('#gg_sum_modal_deselect_all').on('click', () => $('.gg_sum_table_checkbox_modal').prop('checked', false));
+        $('.gg-choice-card').on('click', function (event) {
+            if ($(event.target).is('input')) return;
+            const checkbox = $(this).find('input');
+            checkbox.prop('checked', !checkbox.prop('checked'));
+        });
+        $('#gg_sum_modal_save').on('click', () => {
+            C.manualSummaryTargetTables = $('.gg_sum_table_checkbox_modal:checked').map(function () {
                 return Number($(this).data('table-index'));
             }).get();
             localStorage.setItem('gg_config', JSON.stringify(C));
             persistSummaryState();
-            overlay.remove();
+            const selectedCount = C.manualSummaryTargetTables.length;
+            $('#gg_sum_table_selector_text').text(`🎯 已选择 ${selectedCount} 个表格 (点击修改)`);
+            if (typeof toastr !== 'undefined') toastr.success(`已选择 ${selectedCount} 个表格`, '保存成功', { timeOut: 2000 });
+            close();
             window.Gaigai.SummaryManager.showUI();
         });
-        actions.append(cancel, save);
-        box.append(actions);
-        overlay.append(box);
-        $('body').append(overlay);
+        overlay.on('click', event => {
+            if (event.target === overlay[0]) close();
+        });
+        $(document).off('keydown.gg_sum_modal').on('keydown.gg_sum_modal', event => {
+            if (event.key === 'Escape') close();
+        });
     }
 
     window._gg_openSumTableSelector = function (event) {
@@ -254,51 +295,44 @@
             const selectionText = selected.length
                 ? `🎯 已选择 ${selected.length} 个表格 (点击修改)`
                 : '⚠️ 未选择表格 (点击修改)';
-            const rowAction = normalizeRowAction(C.summaryRowAction);
 
             const html = `
-                <div class="g-p" style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;gap:12px;">
-                    <div style="background:rgba(255,193,7,.08);border-radius:8px;padding:12px;border:1px solid rgba(255,193,7,.55);flex-shrink:0;">
-                        <div style="font-size:11px;font-weight:600;margin-bottom:9px;color:${UI.tc};">⚙️ 自动总结模式：📊 仅表格</div>
-                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                            <label for="gg_summary_pointer_console" style="font-size:11px;font-weight:600;color:${UI.tc};margin:0;">📍 表格总结指针：</label>
-                            <input type="number" id="gg_summary_pointer_console" value="${summaryPointer}" min="0" max="${totalCount}" style="flex:1;min-width:140px;padding:6px;border:1px solid rgba(0,0,0,.18);border-radius:4px;">
-                            <span style="font-size:11px;color:${UI.tc};">/ ${totalCount} 层</span>
-                            <button id="gg_summary_pointer_console_fix" style="padding:6px 12px;border:1px solid rgba(0,0,0,.18);border-radius:5px;cursor:pointer;">修正</button>
+                <div class="g-p" style="display:flex;flex-direction:column;height:100%;box-sizing:border-box;">
+                    <div style="background:rgba(255,193,7,.1);border-radius:6px;padding:12px;margin-bottom:12px;border:1px solid rgba(255,193,7,.3);flex-shrink:0;color:${UI.tc};">
+                        <div style="font-size:12px;font-weight:600;margin-bottom:10px;border-bottom:1px dashed rgba(0,0,0,.1);padding-bottom:8px;">
+                            ⚙️ 自动总结模式：<span style="font-weight:normal;color:#ff9800;">📊 仅表格</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;font-size:10px;color:${UI.tc};opacity:.75;">
-                            <span>💡 指针会随当前聊天保存，切换聊天或角色时自动恢复</span>
-                            <button id="gg_summary_pointer_console_config" style="padding:2px 6px;border:0;background:transparent;color:#ff9800;cursor:pointer;font-size:10px;">修改配置</button>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:11px;">
+                            <span style="font-weight:bold;white-space:nowrap;">📍 表格总结指针:</span>
+                            <div style="display:flex;align-items:center;gap:5px;flex:1;">
+                                <input type="number" id="gg_edit_sum_pointer" value="${summaryPointer}" min="0" max="${totalCount}" style="width:100%;min-width:50px;text-align:center;padding:4px;border-radius:4px;border:1px solid rgba(0,0,0,.2);font-size:11px;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                                <span style="white-space:nowrap;">/ ${totalCount} 层</span>
+                            </div>
+                            <button id="gg_save_sum_pointer_btn" style="padding:4px 12px;background:#ff9800;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;flex-shrink:0;">修正</button>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+                            <span style="font-size:9px;opacity:.6;">💡 指针会自动保存，切换角色时恢复</span>
+                            <a href="javascript:void(0)" id="gg_open_config_link" style="color:#ff9800;text-decoration:underline;cursor:pointer;font-size:11px;white-space:nowrap;">修改配置</a>
                         </div>
                     </div>
-                    <div style="background:transparent;border-radius:8px;padding:12px;border:1px solid rgba(76,175,80,.7);flex-shrink:0;">
+                    <div style="background:transparent;border-radius:8px;padding:12px;border:1px solid rgba(76,175,80,.7);margin-bottom:12px;flex-shrink:0;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                            <h4 style="margin:0;color:${UI.tc};">📊 总结</h4>
+                            <h4 style="margin:0;color:${UI.tc};">📊 表格总结</h4>
                         </div>
                         <div style="font-size:11px;color:${UI.tc};opacity:.8;margin-bottom:10px;">
-                            💡 总结所选记忆表格中当前未归档的白色行，并写入记忆总结表
+                            💡 对当前<strong>未总结</strong>的表格内容（白色行）进行AI总结
                         </div>
                         <div style="background:rgba(255,255,255,.05);border-radius:6px;padding:10px;margin-bottom:10px;border:1px solid rgba(255,255,255,.1);">
-                            <label style="font-size:11px;font-weight:600;color:${UI.tc};display:block;margin-bottom:8px;">🎯 选择要总结的表格：</label>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                <label style="font-size:11px;font-weight:600;color:${UI.tc};">🎯 选择要总结的表格：</label>
+                            </div>
                             <button type="button" id="gg_sum_open_table_selector" style="width:100%;padding:12px;background:${UI.c};color:${UI.tc};border:1px solid rgba(0,0,0,.1);border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">
-                                ${selectionText}
+                                <span style="pointer-events:none;" id="gg_sum_table_selector_text">${selectionText}</span>
                             </button>
-                            <div style="font-size:9px;color:${UI.tc};opacity:.6;margin-top:6px;">共 ${tables.length} 个可选数据表，不包含记忆总结表</div>
+                            <div style="font-size:9px;color:${UI.tc};opacity:.6;margin-top:6px;">💡 默认全选所有表格，可手动勾选需要参与总结的表格</div>
                         </div>
-                        <div style="background:rgba(255,255,255,.05);border-radius:6px;padding:10px;margin-bottom:10px;border:1px solid rgba(255,255,255,.1);">
-                            <label style="font-size:11px;font-weight:600;color:${UI.tc};display:block;margin-bottom:6px;">总结成功后处理源行：</label>
-                            <select id="gg_summary_row_action" style="width:100%;padding:7px;border-radius:4px;">
-                                <option value="keep" ${rowAction === 'keep' ? 'selected' : ''}>保留（继续显示）</option>
-                                <option value="hide" ${rowAction === 'hide' ? 'selected' : ''}>隐藏（标记为绿色已归档）</option>
-                                <option value="delete" ${rowAction === 'delete' ? 'selected' : ''}>删除（从源表移除）</option>
-                            </select>
-                            <label style="display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11px;color:${UI.tc};">
-                                <input type="checkbox" id="gg_summary_silent" ${C.autoSummarySilent ? 'checked' : ''}>
-                                静默保存（关闭后可在写入前检查和编辑总结）
-                            </label>
-                        </div>
-                        <button id="gg_sum_table-snap" style="width:100%;padding:10px;background:${window.Gaigai.isTableSummaryRunning ? '#999' : '#4caf50'};color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;opacity:${window.Gaigai.isTableSummaryRunning ? '.7' : '1'};" ${window.Gaigai.isTableSummaryRunning ? 'disabled' : ''}>
-                            ${window.Gaigai.isTableSummaryRunning ? '⏳ 正在执行...' : '🚀 开始总结'}
+                        <button id="gg_sum_table-snap" style="width:100%;padding:10px;background:${window.Gaigai.isTableSummaryRunning ? '#999' : '#4caf50'};color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:13px;box-shadow:0 2px 5px rgba(0,0,0,.15);opacity:${window.Gaigai.isTableSummaryRunning ? '.7' : '1'};" ${window.Gaigai.isTableSummaryRunning ? 'disabled' : ''}>
+                            ${window.Gaigai.isTableSummaryRunning ? '⏳ 正在执行... (后台运行中)' : '🚀 开始表格总结'}
                         </button>
                         <div id="gg_summary_status" style="text-align:center;margin-top:8px;font-size:11px;color:${UI.tc};opacity:.8;min-height:16px;"></div>
                     </div>
@@ -312,47 +346,38 @@
             const C = window.Gaigai.config_obj;
             const API_CONFIG = window.Gaigai.config;
             const m = window.Gaigai.m;
-            $('#gg_summary_pointer_console_fix').off('click').on('click', async function () {
-                const requested = Number.parseInt($('#gg_summary_pointer_console').val(), 10);
+            $('#gg_save_sum_pointer_btn').off('click').on('click', async function () {
+                const requested = Number.parseInt($('#gg_edit_sum_pointer').val(), 10);
                 const corrected = Math.max(0, Math.min(totalCount, Number.isFinite(requested) ? requested : 0));
                 API_CONFIG.lastSummaryIndex = corrected;
                 API_CONFIG.summarySource = 'table';
-                $('#gg_summary_pointer_console').val(corrected);
+                $('#gg_edit_sum_pointer').val(corrected);
                 localStorage.setItem('gg_api', JSON.stringify(API_CONFIG));
                 await m.save(false, true);
                 await window.Gaigai.customAlert(`表格总结指针已修正为 ${corrected} / ${totalCount} 层。`, '进度已保存');
             });
-            $('#gg_summary_pointer_console_config').off('click').on('click', function () {
+            $('#gg_open_config_link').off('click').on('click', function (event) {
+                event.preventDefault();
                 if (typeof window.Gaigai.navTo === 'function' && typeof window.Gaigai.shcf === 'function') {
                     window.Gaigai.navTo('配置', window.Gaigai.shcf);
                 }
             });
             $('#gg_sum_open_table_selector').off('click').on('click', openTableSelector);
-            $('#gg_summary_row_action').off('change').on('change', function () {
-                C.summaryRowAction = normalizeRowAction($(this).val());
-                localStorage.setItem('gg_config', JSON.stringify(C));
-                persistSummaryState();
-            });
-            $('#gg_summary_silent').off('change').on('change', function () {
-                C.autoSummarySilent = $(this).is(':checked');
-                localStorage.setItem('gg_config', JSON.stringify(C));
-                persistSummaryState();
-            });
             $('#gg_sum_table-snap').off('click').on('click', async () => {
                 const selected = getSelectedTableIndices();
                 if (!selected.length) {
                     await window.Gaigai.customAlert('请至少选择一个有内容的记忆表格。', '提示');
                     return;
                 }
-                const action = normalizeRowAction($('#gg_summary_row_action').val());
-                const silent = $('#gg_summary_silent').is(':checked');
+                const action = normalizeRowAction(C.summaryRowAction);
+                const silent = C.autoSummarySilent === true;
                 window.Gaigai.isTableSummaryRunning = true;
-                $('#gg_sum_table-snap').text('⏳ AI 正在总结...').prop('disabled', true).css('opacity', .7);
+                $('#gg_sum_table-snap').text('⏳ AI正在阅读...').prop('disabled', true).css('opacity', .7);
                 try {
                     await this.callAIForSummary(null, null, 'table', silent, false, false, selected, false, false, action);
                 } finally {
                     window.Gaigai.isTableSummaryRunning = false;
-                    $('#gg_sum_table-snap').text('🚀 开始总结').prop('disabled', false).css('opacity', 1);
+                    $('#gg_sum_table-snap').text('🚀 开始表格总结').prop('disabled', false).css('opacity', 1);
                 }
             });
         }
@@ -479,6 +504,13 @@
                 const vectorResult = await syncSummaryVectors();
                 if (vectorResult && vectorResult.success === false) {
                     throw new Error(vectorResult.error || '向量同步失败');
+                }
+                if (C.autoVectorizeSummary && vectorResult?.success === true) {
+                    const archivedCount = archiveSummaryRowsAfterVectorization();
+                    if (archivedCount > 0) {
+                        persistSummaryState();
+                        console.log(`⚡ [自动向量化] 已归档隐藏记忆总结表 ${archivedCount} 行`);
+                    }
                 }
             } catch (error) {
                 console.error('❌ [表格总结] 总结已保存，但向量同步失败:', error);
